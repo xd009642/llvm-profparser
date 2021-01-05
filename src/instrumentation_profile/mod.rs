@@ -1,7 +1,8 @@
 use core::hash::Hash;
 use nom::multi::count;
+use nom::number::streaming::u64 as nom_u64;
 use nom::number::Endianness;
-use nom::{error::Error, take_str, Err, IResult, Needed};
+use nom::{error::Error, Err, IResult, Needed};
 use std::convert::TryInto;
 use std::fmt::{Debug, Display};
 use std::fs::File;
@@ -94,7 +95,9 @@ impl InstrProfReader for IndexedInstrProf {
         todo!()
     }
 
-    fn parse_header(input: &[u8]) -> IResult<&[u8], Header> {}
+    fn parse_header(input: &[u8]) -> IResult<&[u8], Header> {
+        todo!()
+    }
 
     fn has_format(mut input: impl Read) -> bool {
         const MAGIC: [u8; 8] = [0xff, 0x6c, 0x70, 0x72, 0x6f, 0x66, 0x69, 0x81];
@@ -127,14 +130,27 @@ where
     T: MemoryWidthExt,
 {
     fn parse_bytes(input: &[u8]) -> io::Result<InstrumentationProfile> {
-        if Self::has_format(input) {
-            let endianness = file_endianness::<T>(&input[..8].try_into().unwrap());
-        } else {
-        }
+        let (bytes, header) = Self::parse_header(input).unwrap();
         todo!()
     }
 
-    fn parse_header(input: &[u8]) -> IResult<&[u8], Header> {}
+    fn parse_header(input: &[u8]) -> IResult<&[u8], Header> {
+        if Self::has_format(input) {
+            let endianness = file_endianness::<T>(&input[..8].try_into().unwrap());
+            let (bytes, version) = nom_u64(endianness)(&input[8..])?;
+            let (bytes, data_len) = nom_u64(endianness)(&bytes[..])?;
+            let (bytes, padding_bytes_before_counters) = nom_u64(endianness)(&bytes[..])?;
+            let (bytes, counters_len) = nom_u64(endianness)(&bytes[..])?;
+            let (bytes, padding_bytes_after_counters) = nom_u64(endianness)(&bytes[..])?;
+            let (bytes, names_len) = nom_u64(endianness)(&bytes[..])?;
+            let (bytes, counters_delta) = nom_u64(endianness)(&bytes[..])?;
+            let (bytes, names_delta) = nom_u64(endianness)(&bytes[..])?;
+            let (bytes, value_kind_last) = nom_u64(endianness)(&bytes[..])?;
+        } else {
+            //Err(Err::Error(Needed::new(len as _)))
+        }
+        todo!()
+    }
 
     fn has_format(mut input: impl Read) -> bool {
         let mut buffer: [u8; 8] = [0; 8];
@@ -152,7 +168,9 @@ impl InstrProfReader for TextInstrProf {
         todo!()
     }
 
-    fn parse_header(input: &[u8]) -> IResult<&[u8], Header> {}
+    fn parse_header(input: &[u8]) -> IResult<&[u8], Header> {
+        todo!()
+    }
 
     fn has_format(mut input: impl Read) -> bool {
         // looking at the code it looks like with file memory buffers in llvm it sets the buffer
