@@ -77,6 +77,15 @@ where
     }
 }
 
+impl<T> RawInstrProf<T>
+where
+    T: MemoryWidthExt,
+{
+    fn read_name(input: &[u8], header: &Header) {
+        let input = &input[header.names_delta..];
+    }
+}
+
 impl<T> InstrProfReader for RawInstrProf<T>
 where
     T: MemoryWidthExt,
@@ -86,6 +95,11 @@ where
     fn parse_bytes(input: &[u8]) -> io::Result<InstrumentationProfile> {
         let (bytes, header) = Self::parse_header(input).unwrap();
         println!("File header: {:?}", header);
+        // read name
+        // read func hash
+        // read raw counts
+        // read value profiling data
+        // Next record
         todo!()
     }
 
