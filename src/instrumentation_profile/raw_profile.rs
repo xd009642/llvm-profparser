@@ -82,7 +82,8 @@ where
     T: MemoryWidthExt,
 {
     fn read_name(input: &[u8], header: &Header) {
-        let input = &input[header.names_delta..];
+        let input = &input[(header.names_len as usize)..];
+        println!("thing? {:?}", input);
     }
 }
 
@@ -95,6 +96,7 @@ where
     fn parse_bytes(input: &[u8]) -> io::Result<InstrumentationProfile> {
         let (bytes, header) = Self::parse_header(input).unwrap();
         println!("File header: {:?}", header);
+        Self::read_name(bytes, &header);
         // read name
         // read func hash
         // read raw counts
@@ -115,6 +117,8 @@ where
             let (bytes, counters_delta) = nom_u64(endianness)(&bytes[..])?;
             let (bytes, names_delta) = nom_u64(endianness)(&bytes[..])?;
             let (bytes, value_kind_last) = nom_u64(endianness)(&bytes[..])?;
+
+            let padding_size = get_num_padding_bytes(names_len);
             let result = Header {
                 version,
                 data_len,

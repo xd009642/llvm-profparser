@@ -7,6 +7,10 @@ use std::path::Path;
 
 pub mod raw_profile;
 
+pub fn get_num_padding_bytes(len: u64) -> u8 {
+    7 & (8 - (len % 8) as u8)
+}
+
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub struct InstrumentationProfile;
 
