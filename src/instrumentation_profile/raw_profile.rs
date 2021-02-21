@@ -41,6 +41,17 @@ pub struct Header {
     pub data_size_bytes: u64,
 }
 
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
+pub struct ProfileData<T> {
+    name_ref: u64,
+    func_hash: u64,
+    counter_ptr: T,
+    function_addr: T,
+    values_ptr_expr: T,
+    num_counters: u32,
+    num_value_sites: Vec<u16>,
+}
+
 impl Header {
     // I'm not storing the magic here or relying on repr(c) so hardcoding the size in
     // bytes of the header
