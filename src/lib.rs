@@ -2,6 +2,7 @@ use nom::multi::count;
 use nom::{error::Error, take_str, Err, IResult, Needed};
 
 pub mod instrumentation_profile;
+pub mod util;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub struct CoverageData {

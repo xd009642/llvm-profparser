@@ -7,5 +7,7 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-nom = "6"
+flate2 = "1.0"
 leb128 = "0.2.4"
+nom = "6"
+md5 = "0.7"

@@ -1,4 +1,6 @@
+use crate::instrumentation_profile::symtab::*;
 use crate::instrumentation_profile::*;
+use crate::util::parse_string_ref;
 use core::hash::Hash;
 use nom::number::streaming::u64 as nom_u64;
 use nom::number::Endianness;
@@ -10,6 +12,8 @@ use std::convert::TryInto;
 use std::fmt::{Debug, Display};
 use std::io;
 use std::marker::PhantomData;
+
+const INSTR_PROF_NAME_SEP: char = '\u{1}';
 
 pub type RawInstrProf32 = RawInstrProf<u32>;
 pub type RawInstrProf64 = RawInstrProf<u64>;
@@ -33,12 +37,34 @@ pub struct Header {
     pub counters_delta: u64,
     pub names_delta: u64,
     pub value_kind_last: u64,
+    /// This depends on what type the header is on as it can be u32 or u64 width profiles
+    pub data_size_bytes: u64,
+}
+
+impl Header {
+    // I'm not storing the magic here or relying on repr(c) so hardcoding the size in
+    // bytes of the header
+    const HEADER_SIZE: u64 = 80;
+
+    pub fn counter_offset(&self) -> u64 {
+        Self::HEADER_SIZE + self.data_size_bytes + self.padding_bytes_before_counters
+    }
+
+    pub fn names_offset(&self) -> u64 {
+        self.counter_offset() + (8 * self.counters_len) + self.padding_bytes_after_counters
+    }
+
+    pub fn value_data_offset(&self) -> u64 {
+        self.names_offset() + self.names_len + get_num_padding_bytes(self.names_len) as u64
+    }
 }
 
 pub trait MemoryWidthExt:
     Debug + Clone + Eq + PartialEq + Hash + Ord + PartialOrd + Display
 {
     const MAGIC: u64;
+
+    fn profile_data_size() -> u64;
 }
 
 impl MemoryWidthExt for u32 {
@@ -50,6 +76,10 @@ impl MemoryWidthExt for u32 {
         | ('f' as u64) << 16
         | ('R' as u64) << 8
         | 129;
+
+    fn profile_data_size() -> u64 {
+        todo!()
+    }
 }
 impl MemoryWidthExt for u64 {
     const MAGIC: u64 = (255 << 56)
@@ -60,6 +90,10 @@ impl MemoryWidthExt for u64 {
         | ('f' as u64) << 16
         | ('r' as u64) << 8
         | 129;
+
+    fn profile_data_size() -> u64 {
+        48
+    }
 }
 
 fn file_endianness<T>(magic: &[u8; 8]) -> Endianness
@@ -77,26 +111,28 @@ where
     }
 }
 
-impl<T> RawInstrProf<T>
-where
-    T: MemoryWidthExt,
-{
-    fn read_name(input: &[u8], header: &Header) {
-        let input = &input[(header.names_len as usize)..];
-        println!("thing? {:?}", input);
-    }
-}
-
 impl<T> InstrProfReader for RawInstrProf<T>
 where
     T: MemoryWidthExt,
 {
     type Header = Header;
 
-    fn parse_bytes(input: &[u8]) -> io::Result<InstrumentationProfile> {
-        let (bytes, header) = Self::parse_header(input).unwrap();
+    fn parse_bytes(input: &[u8]) -> IResult<&[u8], InstrumentationProfile> {
+        let (bytes, header) = Self::parse_header(input)?;
         println!("File header: {:?}", header);
-        Self::read_name(bytes, &header);
+        let mut names_remaining = header.names_len as usize;
+        let mut bytes = &input[(header.names_offset() as usize)..];
+        let mut symtab = Symtab::default();
+        while names_remaining > 0 {
+            let start_len = bytes.len();
+            let (new_bytes, names) = parse_string_ref(bytes)?;
+            names_remaining -= (start_len - new_bytes.len());
+            bytes = new_bytes;
+            for name in names.split(INSTR_PROF_NAME_SEP) {
+                symtab.add_func_name(name.to_string());
+            }
+        }
+        println!("GOT the names. {:?}", symtab);
         // read name
         // read func hash
         // read raw counts
@@ -118,6 +154,8 @@ where
             let (bytes, names_delta) = nom_u64(endianness)(&bytes[..])?;
             let (bytes, value_kind_last) = nom_u64(endianness)(&bytes[..])?;
 
+            let data_size_bytes = T::profile_data_size() * data_len;
+
             let padding_size = get_num_padding_bytes(names_len);
             let result = Header {
                 version,
@@ -129,6 +167,7 @@ where
                 counters_delta,
                 names_delta,
                 value_kind_last,
+                data_size_bytes,
             };
             Ok((bytes, result))
         } else {

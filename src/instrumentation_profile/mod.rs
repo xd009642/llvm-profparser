@@ -6,8 +6,9 @@ use std::io::prelude::*;
 use std::path::Path;
 
 pub mod raw_profile;
+pub mod symtab;
 
-pub fn get_num_padding_bytes(len: u64) -> u8 {
+pub const fn get_num_padding_bytes(len: u64) -> u8 {
     7 & (8 - (len % 8) as u8)
 }
 
@@ -28,7 +29,7 @@ pub fn parse(filename: impl AsRef<Path>) -> io::Result<InstrumentationProfile> {
     let mut buffer = Vec::new();
     let mut f = File::open(filename)?;
     f.read_to_end(&mut buffer)?;
-    if IndexedInstrProf::has_format(buffer.as_slice()) {
+    let nom_res = if IndexedInstrProf::has_format(buffer.as_slice()) {
         IndexedInstrProf::parse_bytes(&buffer)
     } else if RawInstrProf64::has_format(buffer.as_slice()) {
         RawInstrProf64::parse_bytes(&buffer)
@@ -37,17 +38,21 @@ pub fn parse(filename: impl AsRef<Path>) -> io::Result<InstrumentationProfile> {
     } else if TextInstrProf::has_format(buffer.as_slice()) {
         TextInstrProf::parse_bytes(&buffer)
     } else {
-        Err(io::Error::new(
+        return Err(io::Error::new(
             io::ErrorKind::Other,
             "Unsupported instrumentation profile format",
-        ))
-    }
+        ));
+    };
+    nom_res.map(|(_bytes, res)| res).map_err(|e| {
+        println!("Parsing failed: {}", e);
+        io::Error::new(io::ErrorKind::Other, "Parsing failed, don't ask me")
+    })
 }
 
 pub trait InstrProfReader {
     type Header;
     /// Parse the profile no lazy parsing here!
-    fn parse_bytes(input: &[u8]) -> io::Result<InstrumentationProfile>;
+    fn parse_bytes(input: &[u8]) -> IResult<&[u8], InstrumentationProfile>;
     /// Parses a header
     fn parse_header(input: &[u8]) -> IResult<&[u8], Self::Header>;
     /// Detects that the bytes match the current reader format if it can't read the format it will
@@ -58,7 +63,7 @@ pub trait InstrProfReader {
 impl InstrProfReader for IndexedInstrProf {
     type Header = Header;
 
-    fn parse_bytes(input: &[u8]) -> io::Result<InstrumentationProfile> {
+    fn parse_bytes(input: &[u8]) -> IResult<&[u8], InstrumentationProfile> {
         todo!()
     }
 
@@ -79,7 +84,7 @@ impl InstrProfReader for IndexedInstrProf {
 
 impl InstrProfReader for TextInstrProf {
     type Header = Header;
-    fn parse_bytes(input: &[u8]) -> io::Result<InstrumentationProfile> {
+    fn parse_bytes(input: &[u8]) -> IResult<&[u8], InstrumentationProfile> {
         todo!()
     }
 
