@@ -2,16 +2,38 @@ use crate::instrumentation_profile::symtab::*;
 use crate::instrumentation_profile::*;
 use crate::util::parse_string_ref;
 use core::hash::Hash;
-use nom::number::streaming::u64 as nom_u64;
+use nom::lib::std::ops::RangeFrom;
+use nom::number::streaming::{u32 as nom_u32, u64 as nom_u64};
 use nom::number::Endianness;
 use nom::{
     error::{Error, ErrorKind},
     Err, IResult, Needed,
 };
+use nom::{InputIter, InputLength, Slice};
 use std::convert::TryInto;
 use std::fmt::{Debug, Display};
 use std::io;
 use std::marker::PhantomData;
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Ord, PartialOrd)]
+pub enum RawProfileError {
+    Eof,
+    UnrecognizedFormat,
+    BadMagic(u64),
+    UnsupportedVersion(usize),
+    UnsupportedHashType,
+    TooLarge,
+    Truncated,
+    Malformed,
+    UnknownFunction,
+    HashMismatch,
+    CountMismatch,
+    CounterOverflow,
+    ValueSiteCountMismatch,
+    CompressFailed,
+    UncompressFailed,
+    EmptyRawProfile,
+}
 
 const INSTR_PROF_NAME_SEP: char = '\u{1}';
 
@@ -26,8 +48,9 @@ where
     phantom: PhantomData<T>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Header {
+    endianness: Endianness,
     pub version: u64,
     pub data_len: u64,
     pub padding_bytes_before_counters: u64,
@@ -49,16 +72,17 @@ pub struct ProfileData<T> {
     function_addr: T,
     values_ptr_expr: T,
     num_counters: u32,
+    /// This might just be two values?
     num_value_sites: Vec<u16>,
 }
 
 impl Header {
     // I'm not storing the magic here or relying on repr(c) so hardcoding the size in
     // bytes of the header
-    const HEADER_SIZE: u64 = 80;
+    const HEADER_SIZE: usize = 80;
 
     pub fn counter_offset(&self) -> u64 {
-        Self::HEADER_SIZE + self.data_size_bytes + self.padding_bytes_before_counters
+        Self::HEADER_SIZE as u64 + self.data_size_bytes + self.padding_bytes_before_counters
     }
 
     pub fn names_offset(&self) -> u64 {
@@ -76,6 +100,10 @@ pub trait MemoryWidthExt:
     const MAGIC: u64;
 
     fn profile_data_size() -> u64;
+
+    fn nom_parse_fn<I>(endianness: Endianness) -> fn(_: I) -> IResult<I, Self>
+    where
+        I: Slice<RangeFrom<usize>> + InputIter<Item = u8> + InputLength;
 }
 
 impl MemoryWidthExt for u32 {
@@ -91,6 +119,13 @@ impl MemoryWidthExt for u32 {
     fn profile_data_size() -> u64 {
         todo!()
     }
+
+    fn nom_parse_fn<I>(endianness: Endianness) -> fn(_: I) -> IResult<I, Self>
+    where
+        I: Slice<RangeFrom<usize>> + InputIter<Item = u8> + InputLength,
+    {
+        nom_u32(endianness)
+    }
 }
 impl MemoryWidthExt for u64 {
     const MAGIC: u64 = (255 << 56)
@@ -103,7 +138,14 @@ impl MemoryWidthExt for u64 {
         | 129;
 
     fn profile_data_size() -> u64 {
-        48
+        48 // TODO what I don't remember where this came from?
+    }
+
+    fn nom_parse_fn<I>(endianness: Endianness) -> fn(_: I) -> IResult<I, Self>
+    where
+        I: Slice<RangeFrom<usize>> + InputIter<Item = u8> + InputLength,
+    {
+        nom_u64(endianness)
     }
 }
 
@@ -130,7 +172,9 @@ where
 
     fn parse_bytes(input: &[u8]) -> IResult<&[u8], InstrumentationProfile> {
         let (bytes, header) = Self::parse_header(input)?;
+        let (_, data) = ProfileData::<T>::parse(&input[Header::HEADER_SIZE..], header.endianness)?;
         println!("File header: {:?}", header);
+        println!("Profile data: {:?}", data);
         let mut names_remaining = header.names_len as usize;
         let mut bytes = &input[(header.names_offset() as usize)..];
         let mut symtab = Symtab::default();
@@ -144,7 +188,6 @@ where
             }
         }
         println!("GOT the names. {:?}", symtab);
-        // read name
         // read func hash
         // read raw counts
         // read value profiling data
@@ -169,6 +212,7 @@ where
 
             let padding_size = get_num_padding_bytes(names_len);
             let result = Header {
+                endianness,
                 version,
                 data_len,
                 padding_bytes_before_counters,
@@ -194,5 +238,34 @@ where
         } else {
             false
         }
+    }
+}
+
+impl<T> ProfileData<T>
+where
+    T: MemoryWidthExt,
+{
+    fn parse(bytes: &[u8], endianness: Endianness) -> IResult<&[u8], Self> {
+        let parse = T::nom_parse_fn(endianness);
+
+        let (bytes, name_ref) = nom_u64(endianness)(&bytes[..])?;
+        let (bytes, func_hash) = nom_u64(endianness)(&bytes[..])?;
+        let (bytes, counter_ptr) = parse(&bytes[..])?;
+        let (bytes, function_addr) = parse(&bytes[..])?;
+        let (bytes, values_ptr_expr) = parse(&bytes[..])?;
+        let (bytes, num_counters) = nom_u32(endianness)(&bytes[..])?;
+
+        Ok((
+            bytes,
+            Self {
+                name_ref,
+                func_hash,
+                counter_ptr,
+                function_addr,
+                values_ptr_expr,
+                num_counters,
+                num_value_sites: vec![], // For my test this is [0, 0]
+            },
+        ))
     }
 }
