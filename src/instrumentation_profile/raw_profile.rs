@@ -200,8 +200,8 @@ where
     T: MemoryWidthExt,
 {
     fn read_raw_counts<'a>(
-        header: &'a Header,
-        data: &'a ProfileData<T>,
+        header: &Header,
+        data: &ProfileData<T>,
         mut bytes: &'a [u8],
     ) -> IResult<&'a [u8], InstrProfRecord> {
         let max_counters = header.max_counters_len();
@@ -229,6 +229,20 @@ where
                 ..Default::default()
             };
             Ok((bytes, record))
+        }
+    }
+
+    fn read_value_profiling_data<'a>(
+        header: &Header,
+        data: &ProfileData<T>,
+        mut bytes: &'a [u8],
+        record: &mut InstrProfRecord,
+    ) -> IResult<&'a [u8], ()> {
+        // record clear value data
+        if data.num_value_sites.iter().all(|x| *x == 0) {
+            Ok((bytes, ()))
+        } else {
+            todo!()
         }
     }
 }
@@ -259,8 +273,15 @@ where
         println!("GOT the names. {:?}", symtab);
         // Missed out func hash but in source it appears to just be copying value from the Data
         // type above into some other types and fixing endianness if needed
-        let raw_counters =
-            Self::read_raw_counts(&header, &data, &input[(header.counters_start() as usize)..]);
+        let (_, mut record) =
+            Self::read_raw_counts(&header, &data, &input[(header.counters_start() as usize)..])?;
+
+        Self::read_value_profiling_data(
+            &header,
+            &data,
+            &input[(header.value_data_start() as usize)..],
+            &mut record,
+        )?;
         // read value profiling data
         // Next record
         todo!()

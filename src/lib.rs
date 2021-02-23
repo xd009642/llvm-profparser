@@ -41,15 +41,6 @@ impl CoverageData {
     }
 }
 
-pub(crate) fn parse_string(input: &[u8]) -> IResult<&[u8], &str> {
-    let (remaining, len) = parse_leb128(input)?;
-    if remaining.len() < len as _ {
-        Err(Err::Incomplete(Needed::new(len as _)))
-    } else {
-        take_str!(remaining, len)
-    }
-}
-
 fn parse_leb128(mut input: &[u8]) -> IResult<&[u8], u64> {
     let x = leb128::read::unsigned(&mut input).unwrap();
     Ok((input, x))
