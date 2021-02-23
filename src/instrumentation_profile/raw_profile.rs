@@ -14,6 +14,7 @@ use std::convert::TryInto;
 use std::fmt::{Debug, Display};
 use std::io;
 use std::marker::PhantomData;
+use std::mem::size_of;
 
 const INDIRECT_CALL_TARGET: usize = 0;
 const MEM_OP_SIZE: usize = 1;
@@ -79,26 +80,53 @@ pub struct ProfileData<T> {
     num_value_sites: [u16; MEM_OP_SIZE + 1],
 }
 
+#[derive(Clone, Debug, Default)]
+pub struct InstrProfRecord {
+    counts: Vec<u64>,
+    value_prof_data: Option<Box<ValueProfData>>,
+}
+
+#[derive(Clone, Debug)]
+pub struct ValueProfData {
+    indirect_callsites: Vec<InstrProfValueSiteRecord>,
+    mem_op_sizes: Vec<InstrProfValueSiteRecord>,
+}
+
+type InstrProfValueSiteRecord = Vec<InstrProfValueData>;
+
+#[derive(Clone, Copy, Debug)]
+pub struct InstrProfValueData {
+    value: u64,
+    count: u64,
+}
+
 impl Header {
     // I'm not storing the magic here or relying on repr(c) so hardcoding the size in
     // bytes of the header
     const HEADER_SIZE: usize = 80;
 
-    pub fn counter_offset(&self) -> u64 {
+    pub fn counters_start(&self) -> u64 {
         Self::HEADER_SIZE as u64 + self.data_size_bytes + self.padding_bytes_before_counters
     }
 
-    pub fn names_offset(&self) -> u64 {
-        self.counter_offset() + (8 * self.counters_len) + self.padding_bytes_after_counters
+    pub fn names_start(&self) -> u64 {
+        self.counters_start() + (8 * self.counters_len) + self.padding_bytes_after_counters
     }
 
-    pub fn value_data_offset(&self) -> u64 {
-        self.names_offset() + self.names_len + get_num_padding_bytes(self.names_len) as u64
+    pub fn value_data_start(&self) -> u64 {
+        self.names_start() + self.names_len + get_num_padding_bytes(self.names_len) as u64
+    }
+
+    pub fn max_counters_len(&self) -> i64 {
+        self.names_start() as i64 - self.counters_start() as i64
     }
 }
 
+/// Trait to represent memory widths. Currently just 32 or 64 bit. This implements Into<u64> so if
+/// we ever move beyond 64 bit systems this code will have to change to Into<u128> or whatever the
+/// next thing is.
 pub trait MemoryWidthExt:
-    Debug + Clone + Eq + PartialEq + Hash + Ord + PartialOrd + Display
+    Debug + Copy + Clone + Eq + PartialEq + Hash + Ord + PartialOrd + Display + Into<u64>
 {
     const MAGIC: u64;
 
@@ -167,6 +195,45 @@ where
     }
 }
 
+impl<T> RawInstrProf<T>
+where
+    T: MemoryWidthExt,
+{
+    fn read_raw_counts<'a>(
+        header: &'a Header,
+        data: &'a ProfileData<T>,
+        mut bytes: &'a [u8],
+    ) -> IResult<&'a [u8], InstrProfRecord> {
+        let max_counters = header.max_counters_len();
+        let counter_offset = (data.counter_ptr.into() as i64 - header.counters_delta as i64)
+            / size_of::<u64>() as i64;
+
+        if data.num_counters == 0
+            || max_counters < 0
+            || data.num_counters as i64 > max_counters
+            || counter_offset < 0
+            || counter_offset > max_counters
+            || counter_offset + data.num_counters as i64 > max_counters
+        {
+            // I AM MALFORMED
+            todo!()
+        } else {
+            let mut counts = Vec::<u64>::new();
+            counts.reserve(data.num_counters as usize);
+            for i in 0..(data.num_counters as usize) {
+                let (b, counter) = nom_u64(header.endianness)(bytes)?;
+                bytes = b;
+                counts.push(counter);
+            }
+            let record = InstrProfRecord {
+                counts,
+                ..Default::default()
+            };
+            Ok((bytes, record))
+        }
+    }
+}
+
 impl<T> InstrProfReader for RawInstrProf<T>
 where
     T: MemoryWidthExt,
@@ -179,7 +246,7 @@ where
         println!("File header: {:?}", header);
         println!("Profile data: {:?}", data);
         let mut names_remaining = header.names_len as usize;
-        let mut bytes = &input[(header.names_offset() as usize)..];
+        let mut bytes = &input[(header.names_start() as usize)..];
         let mut symtab = Symtab::default();
         while names_remaining > 0 {
             let start_len = bytes.len();
@@ -191,8 +258,10 @@ where
             }
         }
         println!("GOT the names. {:?}", symtab);
-        // read func hash
-        // read raw counts
+        // Missed out func hash but in source it appears to just be copying value from the Data
+        // type above into some other types and fixing endianness if needed
+        let raw_counters =
+            Self::read_raw_counts(&header, &data, &input[(header.counters_start() as usize)..]);
         // read value profiling data
         // Next record
         todo!()
