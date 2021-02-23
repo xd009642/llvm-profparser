@@ -3,7 +3,7 @@ use crate::instrumentation_profile::*;
 use crate::util::parse_string_ref;
 use core::hash::Hash;
 use nom::lib::std::ops::RangeFrom;
-use nom::number::streaming::{u32 as nom_u32, u64 as nom_u64};
+use nom::number::streaming::{u16 as nom_u16, u32 as nom_u32, u64 as nom_u64};
 use nom::number::Endianness;
 use nom::{
     error::{Error, ErrorKind},
@@ -14,6 +14,9 @@ use std::convert::TryInto;
 use std::fmt::{Debug, Display};
 use std::io;
 use std::marker::PhantomData;
+
+const INDIRECT_CALL_TARGET: usize = 0;
+const MEM_OP_SIZE: usize = 1;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub enum RawProfileError {
@@ -73,7 +76,7 @@ pub struct ProfileData<T> {
     values_ptr_expr: T,
     num_counters: u32,
     /// This might just be two values?
-    num_value_sites: Vec<u16>,
+    num_value_sites: [u16; MEM_OP_SIZE + 1],
 }
 
 impl Header {
@@ -254,6 +257,8 @@ where
         let (bytes, function_addr) = parse(&bytes[..])?;
         let (bytes, values_ptr_expr) = parse(&bytes[..])?;
         let (bytes, num_counters) = nom_u32(endianness)(&bytes[..])?;
+        let (bytes, value_0) = nom_u16(endianness)(&bytes[..])?;
+        let (bytes, value_1) = nom_u16(endianness)(&bytes[..])?;
 
         Ok((
             bytes,
@@ -264,7 +269,7 @@ where
                 function_addr,
                 values_ptr_expr,
                 num_counters,
-                num_value_sites: vec![], // For my test this is [0, 0]
+                num_value_sites: [value_0, value_1],
             },
         ))
     }
