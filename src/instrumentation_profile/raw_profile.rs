@@ -215,8 +215,7 @@ where
             || counter_offset > max_counters
             || counter_offset + data.num_counters as i64 > max_counters
         {
-            // I AM MALFORMED
-            todo!()
+            Err(Err::Failure(Error::new(bytes, ErrorKind::Satisfy)))
         } else {
             let mut counts = Vec::<u64>::new();
             counts.reserve(data.num_counters as usize);
