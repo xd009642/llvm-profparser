@@ -83,13 +83,14 @@ pub struct ProfileData<T> {
 #[derive(Clone, Debug, Default)]
 pub struct InstrProfRecord {
     counts: Vec<u64>,
-    value_prof_data: Option<Box<ValueProfData>>,
+    indirect_callsites: Vec<InstrProfValueSiteRecord>,
+    mem_op_sizes: Vec<InstrProfValueSiteRecord>,
 }
 
 #[derive(Clone, Debug)]
 pub struct ValueProfData {
-    indirect_callsites: Vec<InstrProfValueSiteRecord>,
-    mem_op_sizes: Vec<InstrProfValueSiteRecord>,
+    total_size: u32,
+    num_value_kinds: u32,
 }
 
 type InstrProfValueSiteRecord = Vec<InstrProfValueData>;
@@ -235,12 +236,13 @@ where
     fn read_value_profiling_data<'a>(
         header: &Header,
         data: &ProfileData<T>,
-        mut bytes: &'a [u8],
+        bytes: &'a [u8],
         record: &mut InstrProfRecord,
     ) -> IResult<&'a [u8], ()> {
         // record clear value data
         if data.num_value_sites.iter().all(|x| *x == 0) {
-            Ok((bytes, ()))
+            let (bytes, total_size) = nom_u32(header.endianess)(bytes)?;
+            todo!()
         } else {
             todo!()
         }
