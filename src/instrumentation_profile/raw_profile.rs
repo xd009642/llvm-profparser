@@ -121,6 +121,10 @@ impl Header {
     pub fn max_counters_len(&self) -> i64 {
         self.names_start() as i64 - self.counters_start() as i64
     }
+
+    pub fn packet_len(&self) -> u64 {
+        Self::HEADER_SIZE as u64 + self.data_size_bytes
+    }
 }
 
 /// Trait to represent memory widths. Currently just 32 or 64 bit. This implements Into<u64> so if
@@ -241,9 +245,11 @@ where
     ) -> IResult<&'a [u8], ()> {
         // record clear value data
         if data.num_value_sites.iter().all(|x| *x == 0) {
-            let (bytes, total_size) = nom_u32(header.endianess)(bytes)?;
-            todo!()
+            // Okay so there's no value profiling data. So the next byte is actually a header
+            // wewww
+            Ok((bytes, ()))
         } else {
+            let (bytes, total_size) = nom_u32(header.endianness)(bytes)?;
             todo!()
         }
     }
@@ -255,37 +261,50 @@ where
 {
     type Header = Header;
 
-    fn parse_bytes(input: &[u8]) -> IResult<&[u8], InstrumentationProfile> {
-        let (bytes, header) = Self::parse_header(input)?;
-        let (_, data) = ProfileData::<T>::parse(&input[Header::HEADER_SIZE..], header.endianness)?;
-        println!("File header: {:?}", header);
-        println!("Profile data: {:?}", data);
-        let mut names_remaining = header.names_len as usize;
-        let mut bytes = &input[(header.names_start() as usize)..];
-        let mut symtab = Symtab::default();
-        while names_remaining > 0 {
-            let start_len = bytes.len();
-            let (new_bytes, names) = parse_string_ref(bytes)?;
-            names_remaining -= (start_len - new_bytes.len());
-            bytes = new_bytes;
-            for name in names.split(INSTR_PROF_NAME_SEP) {
-                symtab.add_func_name(name.to_string());
-            }
-        }
-        println!("GOT the names. {:?}", symtab);
-        // Missed out func hash but in source it appears to just be copying value from the Data
-        // type above into some other types and fixing endianness if needed
-        let (_, mut record) =
-            Self::read_raw_counts(&header, &data, &input[(header.counters_start() as usize)..])?;
+    fn parse_bytes(mut input: &[u8]) -> IResult<&[u8], InstrumentationProfile> {
+        if !input.is_empty() {
+            let (bytes, header) = Self::parse_header(input)?;
+            println!("File header: {:?}", header);
+            let end_length = bytes.len() - header.packet_len() as usize;
+            let mut data_bytes = input;
+            while data_bytes.len() > end_length {
+                let (_, data) =
+                    ProfileData::<T>::parse(&data_bytes[Header::HEADER_SIZE..], header.endianness)?;
+                println!("Profile data: {:?}", data);
+                let mut names_remaining = header.names_len as usize;
+                let mut bytes = &data_bytes[(header.names_start() as usize)..];
+                let mut symtab = Symtab::default();
+                while names_remaining > 0 {
+                    let start_len = bytes.len();
+                    let (new_bytes, names) = parse_string_ref(bytes)?;
+                    names_remaining -= (start_len - new_bytes.len());
+                    bytes = new_bytes;
+                    for name in names.split(INSTR_PROF_NAME_SEP) {
+                        symtab.add_func_name(name.to_string());
+                    }
+                }
+                println!("GOT the names. {:?}", symtab);
+                // Missed out func hash but in source it appears to just be copying value from the Data
+                // type above into some other types and fixing endianness if needed
+                let (_, mut record) = Self::read_raw_counts(
+                    &header,
+                    &data,
+                    &data_bytes[(header.counters_start() as usize)..],
+                )?;
+                println!("Record: {:?}", record);
 
-        Self::read_value_profiling_data(
-            &header,
-            &data,
-            &input[(header.value_data_start() as usize)..],
-            &mut record,
-        )?;
-        // read value profiling data
-        // Next record
+                // read value profiling data
+                let (bytes, _) = Self::read_value_profiling_data(
+                    &header,
+                    &data,
+                    &data_bytes[(header.value_data_start() as usize)..],
+                    &mut record,
+                )?;
+                data_bytes = bytes;
+                println!("Data bytes len: {}", data_bytes.len());
+            }
+            input = bytes;
+        }
         todo!()
     }
 
