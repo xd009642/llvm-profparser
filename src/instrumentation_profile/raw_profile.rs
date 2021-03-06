@@ -7,7 +7,7 @@ use nom::number::streaming::{u16 as nom_u16, u32 as nom_u32, u64 as nom_u64};
 use nom::number::Endianness;
 use nom::{
     error::{Error, ErrorKind},
-    Err, IResult, Needed,
+    take, Err, IResult, Needed,
 };
 use nom::{InputIter, InputLength, Slice};
 use std::convert::TryInto;
@@ -212,7 +212,7 @@ where
         let max_counters = header.max_counters_len();
         let counter_offset = (data.counter_ptr.into() as i64 - header.counters_delta as i64)
             / size_of::<u64>() as i64;
-
+        println!("Max raw counters: {}", max_counters);
         if data.num_counters == 0
             || max_counters < 0
             || data.num_counters as i64 > max_counters
@@ -224,7 +224,7 @@ where
         } else {
             let mut counts = Vec::<u64>::new();
             counts.reserve(data.num_counters as usize);
-            for i in 0..(data.num_counters as usize) {
+            for _ in 0..(data.num_counters as usize) {
                 let (b, counter) = nom_u64(header.endianness)(bytes)?;
                 bytes = b;
                 counts.push(counter);
@@ -262,48 +262,47 @@ where
     type Header = Header;
 
     fn parse_bytes(mut input: &[u8]) -> IResult<&[u8], InstrumentationProfile> {
+        println!("We have {} bytes of input", input.len());
         if !input.is_empty() {
             let (bytes, header) = Self::parse_header(input)?;
-            println!("File header: {:?}", header);
-            let end_length = bytes.len() - header.packet_len() as usize;
-            let mut data_bytes = input;
-            while data_bytes.len() > end_length {
-                let (_, data) =
-                    ProfileData::<T>::parse(&data_bytes[Header::HEADER_SIZE..], header.endianness)?;
-                println!("Profile data: {:?}", data);
-                let mut names_remaining = header.names_len as usize;
-                let mut bytes = &data_bytes[(header.names_start() as usize)..];
-                let mut symtab = Symtab::default();
-                while names_remaining > 0 {
-                    let start_len = bytes.len();
-                    let (new_bytes, names) = parse_string_ref(bytes)?;
-                    names_remaining -= (start_len - new_bytes.len());
-                    bytes = new_bytes;
-                    for name in names.split(INSTR_PROF_NAME_SEP) {
-                        symtab.add_func_name(name.to_string());
-                    }
-                }
-                println!("GOT the names. {:?}", symtab);
-                // Missed out func hash but in source it appears to just be copying value from the Data
-                // type above into some other types and fixing endianness if needed
-                let (_, mut record) = Self::read_raw_counts(
-                    &header,
-                    &data,
-                    &data_bytes[(header.counters_start() as usize)..],
-                )?;
-                println!("Record: {:?}", record);
-
-                // read value profiling data
-                let (bytes, _) = Self::read_value_profiling_data(
-                    &header,
-                    &data,
-                    &data_bytes[(header.value_data_start() as usize)..],
-                    &mut record,
-                )?;
-                data_bytes = bytes;
-                println!("Data bytes len: {}", data_bytes.len());
-            }
             input = bytes;
+            let mut data_section = vec![];
+            for _ in 0..header.data_len {
+                let (bytes, data) = ProfileData::<T>::parse(input, header.endianness)?;
+                data_section.push(data);
+                input = bytes;
+            }
+            println!("Got data section\n:{:?}", data_section);
+            let (bytes, _) = take!(input, header.padding_bytes_before_counters)?;
+            input = bytes;
+            let mut counters = vec![];
+            for data in &data_section {
+                let (bytes, record) = Self::read_raw_counts(&header, data, input)?;
+                counters.push(record);
+                input = bytes;
+            }
+            println!("Got counters: {:?}", counters);
+            let (bytes, _) = take!(input, header.padding_bytes_after_counters)?;
+            input = bytes;
+            let end_length = input.len() - header.names_len as usize;
+            let mut symtab = Symtab::default();
+            while input.len() > end_length {
+                let (new_bytes, names) = parse_string_ref(input)?;
+                input = new_bytes;
+                for name in names.split(INSTR_PROF_NAME_SEP) {
+                    symtab.add_func_name(name.to_string());
+                }
+            }
+            println!("Got names {:?}", symtab);
+            let padding = get_num_padding_bytes(header.names_len);
+            let (bytes, _) = take!(input, padding)?;
+            input = bytes;
+            for (data, mut record) in data_section.iter().zip(counters.iter_mut()) {
+                let (bytes, _) =
+                    Self::read_value_profiling_data(&header, &data, input, &mut record)?;
+                input = bytes;
+            }
+            println!("End records: {:?}", counters);
         }
         todo!()
     }
@@ -323,7 +322,6 @@ where
 
             let data_size_bytes = T::profile_data_size() * data_len;
 
-            let padding_size = get_num_padding_bytes(names_len);
             let result = Header {
                 endianness,
                 version,
