@@ -4,10 +4,16 @@ version = "0.1.0"
 authors = ["xd009642 <danielmckenna93@gmail.com>"]
 edition = "2018"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[features]
+cli = ["structopt"]
 
 [dependencies]
 flate2 = "1.0"
 leb128 = "0.2.4"
 nom = "6"
 md5 = "0.7"
+structopt = { version = "0.3.21", optional = true }
+
+[[bin]]
+name = "llvm_profparser"
+required-features = ["cli"]

@@ -1,4 +1,4 @@
-use crate::instrumentation_profile::symtab::*;
+use crate::instrumentation_profile::types::*;
 use crate::instrumentation_profile::*;
 use crate::util::parse_string_ref;
 use core::hash::Hash;
@@ -13,7 +13,6 @@ use nom::{InputIter, InputLength, Slice};
 use std::convert::TryInto;
 use std::fmt::{Debug, Display};
 use std::io;
-use std::marker::PhantomData;
 use std::mem::size_of;
 
 const INDIRECT_CALL_TARGET: usize = 0;
@@ -44,12 +43,14 @@ const INSTR_PROF_NAME_SEP: char = '\u{1}';
 pub type RawInstrProf32 = RawInstrProf<u32>;
 pub type RawInstrProf64 = RawInstrProf<u64>;
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct RawInstrProf<T>
 where
     T: MemoryWidthExt,
 {
-    phantom: PhantomData<T>,
+    header: Header,
+    data: Vec<ProfileData<T>>,
+    records: Vec<InstrProfRecord>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -78,27 +79,6 @@ pub struct ProfileData<T> {
     num_counters: u32,
     /// This might just be two values?
     num_value_sites: [u16; MEM_OP_SIZE + 1],
-}
-
-#[derive(Clone, Debug, Default)]
-pub struct InstrProfRecord {
-    counts: Vec<u64>,
-    indirect_callsites: Vec<InstrProfValueSiteRecord>,
-    mem_op_sizes: Vec<InstrProfValueSiteRecord>,
-}
-
-#[derive(Clone, Debug)]
-pub struct ValueProfData {
-    total_size: u32,
-    num_value_kinds: u32,
-}
-
-type InstrProfValueSiteRecord = Vec<InstrProfValueData>;
-
-#[derive(Clone, Copy, Debug)]
-pub struct InstrProfValueData {
-    value: u64,
-    count: u64,
 }
 
 impl Header {
@@ -212,7 +192,6 @@ where
         let max_counters = header.max_counters_len();
         let counter_offset = (data.counter_ptr.into() as i64 - header.counters_delta as i64)
             / size_of::<u64>() as i64;
-        println!("Max raw counters: {}", max_counters);
         if data.num_counters == 0
             || max_counters < 0
             || data.num_counters as i64 > max_counters
@@ -303,6 +282,9 @@ where
                 input = bytes;
             }
             println!("End records: {:?}", counters);
+            // return profile here
+        } else {
+            // Okay return an error here
         }
         todo!()
     }

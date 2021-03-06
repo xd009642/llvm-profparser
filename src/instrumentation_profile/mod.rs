@@ -1,4 +1,5 @@
 use crate::instrumentation_profile::raw_profile::*;
+use crate::instrumentation_profile::types::*;
 use nom::IResult;
 use std::fs::File;
 use std::io;
@@ -6,14 +7,11 @@ use std::io::prelude::*;
 use std::path::Path;
 
 pub mod raw_profile;
-pub mod symtab;
+pub mod types;
 
 pub const fn get_num_padding_bytes(len: u64) -> u8 {
     7 & (8 - (len % 8) as u8)
 }
-
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
-pub struct InstrumentationProfile;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub struct Header {
