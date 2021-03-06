@@ -2,9 +2,9 @@ use std::collections::BTreeMap;
 use std::convert::TryInto;
 
 /// This is taken from `llvm/include/llvm/ProfileData/InstrProfileData.inc`
-const VARIANT_MASK_IR_PROF: u64 = (1u64 << 56);
+const VARIANT_MASK_IR_PROF: u64 = 1u64 << 56;
 /// This is taken from `llvm/include/llvm/ProfileData/InstrProfileData.inc`
-const VARIANT_MASK_CSIR_PROF: u64 = (1u64 << 57);
+const VARIANT_MASK_CSIR_PROF: u64 = 1u64 << 57;
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Ord, PartialOrd, Hash)]
 pub struct Symtab {

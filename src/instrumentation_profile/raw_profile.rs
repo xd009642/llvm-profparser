@@ -12,7 +12,6 @@ use nom::{
 use nom::{InputIter, InputLength, Slice};
 use std::convert::TryInto;
 use std::fmt::{Debug, Display};
-use std::io;
 use std::mem::size_of;
 
 const INDIRECT_CALL_TARGET: usize = 0;
@@ -65,8 +64,6 @@ pub struct Header {
     pub counters_delta: u64,
     pub names_delta: u64,
     pub value_kind_last: u64,
-    /// This depends on what type the header is on as it can be u32 or u64 width profiles
-    pub data_size_bytes: u64,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
@@ -82,28 +79,8 @@ pub struct ProfileData<T> {
 }
 
 impl Header {
-    // I'm not storing the magic here or relying on repr(c) so hardcoding the size in
-    // bytes of the header
-    const HEADER_SIZE: usize = 80;
-
-    pub fn counters_start(&self) -> u64 {
-        Self::HEADER_SIZE as u64 + self.data_size_bytes + self.padding_bytes_before_counters
-    }
-
-    pub fn names_start(&self) -> u64 {
-        self.counters_start() + (8 * self.counters_len) + self.padding_bytes_after_counters
-    }
-
-    pub fn value_data_start(&self) -> u64 {
-        self.names_start() + self.names_len + get_num_padding_bytes(self.names_len) as u64
-    }
-
     pub fn max_counters_len(&self) -> i64 {
-        self.names_start() as i64 - self.counters_start() as i64
-    }
-
-    pub fn packet_len(&self) -> u64 {
-        Self::HEADER_SIZE as u64 + self.data_size_bytes
+        ((8 * self.counters_len) + self.padding_bytes_after_counters) as i64
     }
 }
 
@@ -114,8 +91,6 @@ pub trait MemoryWidthExt:
     Debug + Copy + Clone + Eq + PartialEq + Hash + Ord + PartialOrd + Display + Into<u64>
 {
     const MAGIC: u64;
-
-    fn profile_data_size() -> u64;
 
     fn nom_parse_fn<I>(endianness: Endianness) -> fn(_: I) -> IResult<I, Self>
     where
@@ -131,10 +106,6 @@ impl MemoryWidthExt for u32 {
         | ('f' as u64) << 16
         | ('R' as u64) << 8
         | 129;
-
-    fn profile_data_size() -> u64 {
-        todo!()
-    }
 
     fn nom_parse_fn<I>(endianness: Endianness) -> fn(_: I) -> IResult<I, Self>
     where
@@ -152,10 +123,6 @@ impl MemoryWidthExt for u64 {
         | ('f' as u64) << 16
         | ('r' as u64) << 8
         | 129;
-
-    fn profile_data_size() -> u64 {
-        48 // TODO what I don't remember where this came from?
-    }
 
     fn nom_parse_fn<I>(endianness: Endianness) -> fn(_: I) -> IResult<I, Self>
     where
@@ -302,8 +269,6 @@ where
             let (bytes, names_delta) = nom_u64(endianness)(&bytes[..])?;
             let (bytes, value_kind_last) = nom_u64(endianness)(&bytes[..])?;
 
-            let data_size_bytes = T::profile_data_size() * data_len;
-
             let result = Header {
                 endianness,
                 version,
@@ -315,7 +280,6 @@ where
                 counters_delta,
                 names_delta,
                 value_kind_last,
-                data_size_bytes,
             };
             Ok((bytes, result))
         } else {
