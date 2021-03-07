@@ -244,8 +244,7 @@ where
                 let (bytes, _) =
                     Self::read_value_profiling_data(&header, &data, input, &mut record)?;
                 input = bytes;
-
-                let name = symtab.names.get(&data.func_hash).cloned();
+                let name = symtab.names.get(&data.name_ref).cloned(); // TODO are name_ref and func_hash right on data?
                 let hash = if name.is_some() {
                     Some(data.func_hash)
                 } else {
@@ -255,6 +254,7 @@ where
                     .records
                     .push(NamedInstrProfRecord { name, hash, record });
             }
+            result.symtab = symtab;
             Ok((input, result))
         } else {
             // Okay return an error here

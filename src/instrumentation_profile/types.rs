@@ -22,6 +22,7 @@ impl Symtab {
 #[derive(Debug, Default, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub struct InstrumentationProfile {
     pub records: Vec<NamedInstrProfRecord>,
+    pub symtab: Symtab,
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Hash, Ord, PartialOrd)]
@@ -33,14 +34,14 @@ pub struct NamedInstrProfRecord {
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub struct InstrProfRecord {
-    pub(crate) counts: Vec<u64>,
-    pub(crate) data: Option<Box<ValueProfDataRecord>>,
+    pub counts: Vec<u64>,
+    pub data: Option<Box<ValueProfDataRecord>>,
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub struct ValueProfDataRecord {
-    pub(crate) indirect_callsites: Vec<InstrProfValueSiteRecord>,
-    pub(crate) mem_op_sizes: Vec<InstrProfValueSiteRecord>,
+    pub indirect_callsites: Vec<InstrProfValueSiteRecord>,
+    pub mem_op_sizes: Vec<InstrProfValueSiteRecord>,
 }
 
 type InstrProfValueSiteRecord = Vec<InstrProfValueData>;
