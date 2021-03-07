@@ -208,8 +208,8 @@ where
     type Header = Header;
 
     fn parse_bytes(mut input: &[u8]) -> IResult<&[u8], InstrumentationProfile> {
-        println!("We have {} bytes of input", input.len());
         if !input.is_empty() {
+            let mut result = InstrumentationProfile::default();
             let (bytes, header) = Self::parse_header(input)?;
             input = bytes;
             let mut data_section = vec![];
@@ -218,7 +218,6 @@ where
                 data_section.push(data);
                 input = bytes;
             }
-            println!("Got data section\n:{:?}", data_section);
             let (bytes, _) = take!(input, header.padding_bytes_before_counters)?;
             input = bytes;
             let mut counters = vec![];
@@ -227,7 +226,6 @@ where
                 counters.push(record);
                 input = bytes;
             }
-            println!("Got counters: {:?}", counters);
             let (bytes, _) = take!(input, header.padding_bytes_after_counters)?;
             input = bytes;
             let end_length = input.len() - header.names_len as usize;
@@ -239,21 +237,29 @@ where
                     symtab.add_func_name(name.to_string());
                 }
             }
-            println!("Got names {:?}", symtab);
             let padding = get_num_padding_bytes(header.names_len);
             let (bytes, _) = take!(input, padding)?;
             input = bytes;
-            for (data, mut record) in data_section.iter().zip(counters.iter_mut()) {
+            for (data, mut record) in data_section.iter().zip(counters.drain(..)) {
                 let (bytes, _) =
                     Self::read_value_profiling_data(&header, &data, input, &mut record)?;
                 input = bytes;
+
+                let name = symtab.names.get(&data.func_hash).cloned();
+                let hash = if name.is_some() {
+                    Some(data.func_hash)
+                } else {
+                    None
+                };
+                result
+                    .records
+                    .push(NamedInstrProfRecord { name, hash, record });
             }
-            println!("End records: {:?}", counters);
-            // return profile here
+            Ok((input, result))
         } else {
             // Okay return an error here
+            todo!()
         }
-        todo!()
     }
 
     fn parse_header(input: &[u8]) -> IResult<&[u8], Self::Header> {
