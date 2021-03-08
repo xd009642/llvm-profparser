@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 use std::convert::TryInto;
+use std::fmt;
 
 const VARIANT_MASKS_ALL: u64 = 0xff00_0000_0000_0000;
 /// This is taken from `llvm/include/llvm/ProfileData/InstrProfileData.inc`
@@ -13,10 +14,31 @@ pub struct Symtab {
 }
 
 impl Symtab {
+    pub fn len(&self) -> usize {
+        self.names.len()
+    }
+}
+
+impl Symtab {
     pub fn add_func_name(&mut self, name: String) {
         let hash = md5::compute(&name).0[..8].try_into().unwrap();
         let hash = u64::from_ne_bytes(hash);
         self.names.insert(hash, name);
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Ord, PartialOrd, Hash)]
+pub enum InstrumentationLevel {
+    FrontEnd,
+    Ir,
+}
+
+impl fmt::Display for InstrumentationLevel {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::FrontEnd => write!(f, "Front-end"),
+            Self::Ir => write!(f, "IR"),
+        }
     }
 }
 
@@ -38,6 +60,14 @@ impl InstrumentationProfile {
 
     pub fn has_csir_level_profile(&self) -> bool {
         (self.version & VARIANT_MASK_CSIR_PROF) != 0
+    }
+
+    pub fn get_level(&self) -> InstrumentationLevel {
+        if self.is_ir_level_profile() {
+            InstrumentationLevel::Ir
+        } else {
+            InstrumentationLevel::FrontEnd
+        }
     }
 }
 

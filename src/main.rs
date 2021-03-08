@@ -50,11 +50,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                 }
             }
-            println!("Instrumentation level: ?");
+            println!("Instrumentation level: {}", profile.get_level());
             if show.all_functions {
                 println!("Functions shown: {}", shown_funcs);
             }
-            println!("Total functions: ?");
+            println!("Total functions: {}", profile.symtab.len());
             println!("Maximum function count: ?");
             println!("Maximum internal block count: ?");
         }
