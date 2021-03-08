@@ -1,3 +1,4 @@
+use llvm_profparser::instrumentation_profile::stats::*;
 use llvm_profparser::instrumentation_profile::summary::*;
 use llvm_profparser::instrumentation_profile::types::*;
 use llvm_profparser::parse;
@@ -82,10 +83,11 @@ impl ShowCommand {
     pub fn run(&self) -> Result<(), Box<dyn std::error::Error>> {
         let profile = parse(&self.input)?;
         let mut summary = ProfileSummary::new();
+        let mut stats = vec![ValueSiteStats::default(); ValueKind::len()];
 
-        println!("Version: {}", profile.version());
         let is_ir_instr = profile.is_ir_level_profile();
         let mut shown_funcs = 0;
+        println!("Counters:");
         if self.all_functions {
             for func in &profile.records {
                 if func.name.is_none() || func.hash.is_none() {
@@ -104,10 +106,20 @@ impl ShowCommand {
                         "    Indirect Call Site Count: {}",
                         func.num_value_sites(ValueKind::IndirectCallTarget)
                     );
+                    stats[ValueKind::IndirectCallTarget as usize].traverse_sites(
+                        &func.record,
+                        ValueKind::IndirectCallTarget,
+                        Some(&profile.symtab),
+                    );
                 }
                 let num_memop_calls = func.num_value_sites(ValueKind::MemOpSize);
                 if self.memop_sizes && num_memop_calls > 0 {
                     println!("    Number of Memory Intrinsics Calls: {}", num_memop_calls);
+                    stats[ValueKind::MemOpSize as usize].traverse_sites(
+                        &func.record,
+                        ValueKind::MemOpSize,
+                        None,
+                    );
                 }
                 if self.show_counts {
                     let start = if is_ir_instr { 0 } else { 1 };
@@ -135,6 +147,22 @@ impl ShowCommand {
             "Maximum internal block count: {}",
             summary.max_internal_block_count()
         );
+        if let Some(_topn) = self.topn {}
+
+        if self.ic_targets && shown_funcs > 0 {
+            println!("Statistics for indirect call sites profile:");
+            println!("{}", stats[ValueKind::IndirectCallTarget as usize]);
+        }
+
+        if self.memop_sizes && shown_funcs > 0 {
+            println!("Statistics for memory instrinsic calls sizes profile:");
+            println!("{}", stats[ValueKind::MemOpSize as usize]);
+        }
+
+        if self.show_detailed_summary {
+            println!("Total number of blocks: ?");
+            println!("Total count: ?");
+        }
         Ok(())
     }
 }

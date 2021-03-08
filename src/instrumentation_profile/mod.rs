@@ -7,6 +7,7 @@ use std::io::prelude::*;
 use std::path::Path;
 
 pub mod raw_profile;
+pub mod stats;
 pub mod summary;
 pub mod types;
 

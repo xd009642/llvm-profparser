@@ -14,6 +14,12 @@ pub enum ValueKind {
     MemOpSize = 1,
 }
 
+impl ValueKind {
+    pub const fn len() -> usize {
+        2
+    }
+}
+
 #[derive(Debug, Clone, Default, PartialEq, Eq, Ord, PartialOrd, Hash)]
 pub struct Symtab {
     pub names: BTreeMap<u64, String>,
