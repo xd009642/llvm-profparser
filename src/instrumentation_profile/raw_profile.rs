@@ -211,6 +211,7 @@ where
         if !input.is_empty() {
             let mut result = InstrumentationProfile::default();
             let (bytes, header) = Self::parse_header(input)?;
+            result.version = header.version;
             input = bytes;
             let mut data_section = vec![];
             for _ in 0..header.data_len {

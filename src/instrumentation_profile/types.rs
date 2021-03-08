@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 use std::convert::TryInto;
 
+const VARIANT_MASKS_ALL: u64 = 0xff00_0000_0000_0000;
 /// This is taken from `llvm/include/llvm/ProfileData/InstrProfileData.inc`
 const VARIANT_MASK_IR_PROF: u64 = 1u64 << 56;
 /// This is taken from `llvm/include/llvm/ProfileData/InstrProfileData.inc`
@@ -21,8 +22,23 @@ impl Symtab {
 
 #[derive(Debug, Default, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub struct InstrumentationProfile {
+    pub(crate) version: u64,
     pub records: Vec<NamedInstrProfRecord>,
     pub symtab: Symtab,
+}
+
+impl InstrumentationProfile {
+    pub fn version(&self) -> u64 {
+        self.version & !VARIANT_MASKS_ALL
+    }
+
+    pub fn is_ir_level_profile(&self) -> bool {
+        (self.version & VARIANT_MASK_IR_PROF) != 0
+    }
+
+    pub fn has_csir_level_profile(&self) -> bool {
+        (self.version & VARIANT_MASK_CSIR_PROF) != 0
+    }
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Hash, Ord, PartialOrd)]

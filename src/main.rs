@@ -33,7 +33,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     match opts.cmd {
         Command::Show { show } => {
             let profile = parse(&show.input)?;
-            let is_ir_instr = true; // TODO
+            println!("Version: {}", profile.version());
+            let is_ir_instr = profile.is_ir_level_profile();
             let mut shown_funcs = 0;
             if show.all_functions {
                 for func in &profile.records {
@@ -44,7 +45,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     println!("  {}:", func.name.as_ref().unwrap());
                     println!("    Hash: {}", func.hash.unwrap());
                     println!("    Counters: {}", func.record.counts.len());
-                    if is_ir_instr {
+                    if !is_ir_instr {
                         println!("    Function Count: {}", func.record.counts[0]);
                     }
                 }
