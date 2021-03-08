@@ -1,3 +1,4 @@
+use llvm_profparser::instrumentation_profile::types::*;
 use llvm_profparser::parse;
 use std::path::PathBuf;
 use structopt::StructOpt;
@@ -17,6 +18,9 @@ pub struct ShowCommand {
     /// Input profraw file to show some information about
     #[structopt(name = "input", long = "input", short = "i")]
     input: PathBuf,
+    /// Show counter values for shown functions
+    #[structopt(long = "counts")]
+    show_counts: bool,
     /// Details for every function
     #[structopt(long = "all-functions")]
     all_functions: bool,
@@ -43,10 +47,10 @@ pub struct ShowCommand {
     showcs: bool,
     /// Details for matching functions
     #[structopt(long = "function")]
-    function: String,
+    function: Option<String>,
     /// Output file
     #[structopt(long = "output", short = "o")]
-    output: String,
+    output: Option<String>,
     /// Show the list of functions with the largest internal counts
     #[structopt(long = "topn")]
     topn: Option<usize>,
@@ -73,39 +77,70 @@ pub struct Opts {
     cmd: Command,
 }
 
+impl ShowCommand {
+    pub fn run(&self) -> Result<(), Box<dyn std::error::Error>> {
+        use InstrumentationProfileValueKind::*;
+
+        let profile = parse(&self.input)?;
+
+        println!("Version: {}", profile.version());
+        let is_ir_instr = profile.is_ir_level_profile();
+        let mut shown_funcs = 0;
+        if self.all_functions {
+            for func in &profile.records {
+                if func.name.is_none() || func.hash.is_none() {
+                    continue;
+                }
+                shown_funcs += 1;
+                println!("  {}:", func.name.as_ref().unwrap());
+                println!("    Hash: 0x{:x}", func.hash.unwrap());
+                println!("    Counters: {}", func.record.counts.len());
+                if !is_ir_instr {
+                    println!("    Function Count: {}", func.record.counts[0]);
+                }
+                if self.ic_targets {
+                    println!(
+                        "    Indirect Call Site Count: {}",
+                        func.num_value_sites(IndirectCallTarget)
+                    );
+                }
+                let num_memop_calls = func.num_value_sites(MemOpSize);
+                if self.memop_sizes && num_memop_calls > 0 {
+                    println!("    Number of Memory Intrinsics Calls: {}", num_memop_calls);
+                }
+                if self.show_counts {
+                    let start = if is_ir_instr { 0 } else { 1 };
+                    let counts = func
+                        .counts()
+                        .iter()
+                        .skip(start)
+                        .map(|x| x.to_string())
+                        .collect::<Vec<String>>()
+                        .join(",");
+                    println!("    Block counts: [{}]", counts);
+                }
+                if self.ic_targets {
+                    println!("    Indirect Target Results:");
+                }
+            }
+        }
+        println!("Instrumentation level: {}", profile.get_level());
+        if self.all_functions {
+            println!("Functions shown: {}", shown_funcs);
+        }
+        println!("Total functions: {}", profile.symtab.len());
+        println!("Maximum function count: ?");
+        println!("Maximum internal block count: ?");
+        Ok(())
+    }
+}
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let opts = Opts::from_args();
     match opts.cmd {
-        Command::Show { show } => {
-            let profile = parse(&show.input)?;
-            println!("Version: {}", profile.version());
-            let is_ir_instr = profile.is_ir_level_profile();
-            let mut shown_funcs = 0;
-            if show.all_functions {
-                for func in &profile.records {
-                    if func.name.is_none() || func.hash.is_none() {
-                        continue;
-                    }
-                    shown_funcs += 1;
-                    println!("  {}:", func.name.as_ref().unwrap());
-                    println!("    Hash: {}", func.hash.unwrap());
-                    println!("    Counters: {}", func.record.counts.len());
-                    if !is_ir_instr {
-                        println!("    Function Count: {}", func.record.counts[0]);
-                    }
-                }
-            }
-            println!("Instrumentation level: {}", profile.get_level());
-            if show.all_functions {
-                println!("Functions shown: {}", shown_funcs);
-            }
-            println!("Total functions: {}", profile.symtab.len());
-            println!("Maximum function count: ?");
-            println!("Maximum internal block count: ?");
-        }
+        Command::Show { show } => show.run(),
         _ => {
             panic!("Unsupported command");
         }
     }
-    Ok(())
 }

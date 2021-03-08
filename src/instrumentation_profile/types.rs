@@ -8,6 +8,12 @@ const VARIANT_MASK_IR_PROF: u64 = 1u64 << 56;
 /// This is taken from `llvm/include/llvm/ProfileData/InstrProfileData.inc`
 const VARIANT_MASK_CSIR_PROF: u64 = 1u64 << 57;
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Ord, PartialOrd, Hash)]
+pub enum InstrumentationProfileValueKind {
+    IndirectCallTarget = 0,
+    MemOpSize = 1,
+}
+
 #[derive(Debug, Clone, Default, PartialEq, Eq, Ord, PartialOrd, Hash)]
 pub struct Symtab {
     pub names: BTreeMap<u64, String>,
@@ -76,6 +82,22 @@ pub struct NamedInstrProfRecord {
     pub name: Option<String>,
     pub hash: Option<u64>,
     pub record: InstrProfRecord,
+}
+
+impl NamedInstrProfRecord {
+    pub fn num_value_sites(&self, valuekind: InstrumentationProfileValueKind) -> usize {
+        use InstrumentationProfileValueKind::*;
+        let record_data = self.record.data.as_ref();
+        match valuekind {
+            IndirectCallTarget => record_data.map(|x| x.indirect_callsites.len()),
+            MemOpSize => record_data.map(|x| x.mem_op_sizes.len()),
+        }
+        .unwrap_or_default()
+    }
+
+    pub fn counts(&self) -> &[u64] {
+        &self.record.counts
+    }
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Hash, Ord, PartialOrd)]

@@ -14,9 +14,6 @@ use std::convert::TryInto;
 use std::fmt::{Debug, Display};
 use std::mem::size_of;
 
-const INDIRECT_CALL_TARGET: usize = 0;
-const MEM_OP_SIZE: usize = 1;
-
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub enum RawProfileError {
     Eof,
@@ -75,7 +72,7 @@ pub struct ProfileData<T> {
     values_ptr_expr: T,
     num_counters: u32,
     /// This might just be two values?
-    num_value_sites: [u16; MEM_OP_SIZE + 1],
+    num_value_sites: [u16; InstrumentationProfileValueKind::MemOpSize as usize + 1],
 }
 
 impl Header {
