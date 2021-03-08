@@ -20,6 +20,51 @@ pub struct ShowCommand {
     /// Details for every function
     #[structopt(long = "all-functions")]
     all_functions: bool,
+    /// Show instr profile data in text dump format
+    #[structopt(long = "text")]
+    text: bool,
+    /// Show indirect call site target values for shown functions
+    #[structopt(long = "ic-targets")]
+    ic_targets: bool,
+    /// Show the profiled sizes of the memory intrinsic call for shown functions"
+    #[structopt(long = "memop-sizes")]
+    memop_sizes: bool,
+    /// Show detailed profile summary
+    #[structopt(long = "show_detailed_summary")]
+    show_detailed_summary: bool,
+    /// Cutoff percentages (times 10000) for generating detailed summary
+    #[structopt(long = "detailed_summary_cutoffs")]
+    detailed_summary_cutoffs: Vec<usize>,
+    /// Show profile summary of a list of hot functions
+    #[structopt(long = "show_hot_fn_list")]
+    show_hot_fn_list: bool,
+    /// Show context sensitive counts
+    #[structopt(long = "showcs")]
+    showcs: bool,
+    /// Details for matching functions
+    #[structopt(long = "function")]
+    function: String,
+    /// Output file
+    #[structopt(long = "output", short = "o")]
+    output: String,
+    /// Show the list of functions with the largest internal counts
+    #[structopt(long = "topn")]
+    topn: Option<usize>,
+    /// Set the count value cutoff. Functions with the maximum count less than
+    /// this value will not be printed out. (Default is 0)
+    #[structopt(long = "value_cutoff")]
+    value_cutoff: Option<usize>,
+    /// Set the count value cutoff. Functions with the maximum count below the
+    /// cutoff value
+    #[structopt(long = "only_list_below")]
+    only_list_below: bool,
+    /// Show profile symbol list if it exists in the profile.
+    #[structopt(long = "show_profile_sym_list")]
+    show_profile_sym_list: bool,
+    /// Show the information of each section in the sample profile. The flag is
+    /// only usable when the sample profile is in extbinary format
+    #[structopt(long = "show_section_info_only")]
+    show_section_info_only: bool,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, StructOpt)]
