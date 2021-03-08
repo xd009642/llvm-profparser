@@ -7,6 +7,7 @@ use std::io::prelude::*;
 use std::path::Path;
 
 pub mod raw_profile;
+pub mod summary;
 pub mod types;
 
 pub const fn get_num_padding_bytes(len: u64) -> u8 {

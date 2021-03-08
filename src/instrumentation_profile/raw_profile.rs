@@ -72,7 +72,7 @@ pub struct ProfileData<T> {
     values_ptr_expr: T,
     num_counters: u32,
     /// This might just be two values?
-    num_value_sites: [u16; InstrumentationProfileValueKind::MemOpSize as usize + 1],
+    num_value_sites: [u16; ValueKind::MemOpSize as usize + 1],
 }
 
 impl Header {

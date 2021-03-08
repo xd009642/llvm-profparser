@@ -1,3 +1,4 @@
+use llvm_profparser::instrumentation_profile::summary::*;
 use llvm_profparser::instrumentation_profile::types::*;
 use llvm_profparser::parse;
 use std::path::PathBuf;
@@ -79,9 +80,8 @@ pub struct Opts {
 
 impl ShowCommand {
     pub fn run(&self) -> Result<(), Box<dyn std::error::Error>> {
-        use InstrumentationProfileValueKind::*;
-
         let profile = parse(&self.input)?;
+        let mut summary = ProfileSummary::new();
 
         println!("Version: {}", profile.version());
         let is_ir_instr = profile.is_ir_level_profile();
@@ -91,6 +91,7 @@ impl ShowCommand {
                 if func.name.is_none() || func.hash.is_none() {
                     continue;
                 }
+                summary.add_record(&func.record);
                 shown_funcs += 1;
                 println!("  {}:", func.name.as_ref().unwrap());
                 println!("    Hash: 0x{:x}", func.hash.unwrap());
@@ -101,10 +102,10 @@ impl ShowCommand {
                 if self.ic_targets {
                     println!(
                         "    Indirect Call Site Count: {}",
-                        func.num_value_sites(IndirectCallTarget)
+                        func.num_value_sites(ValueKind::IndirectCallTarget)
                     );
                 }
-                let num_memop_calls = func.num_value_sites(MemOpSize);
+                let num_memop_calls = func.num_value_sites(ValueKind::MemOpSize);
                 if self.memop_sizes && num_memop_calls > 0 {
                     println!("    Number of Memory Intrinsics Calls: {}", num_memop_calls);
                 }
@@ -128,9 +129,12 @@ impl ShowCommand {
         if self.all_functions {
             println!("Functions shown: {}", shown_funcs);
         }
-        println!("Total functions: {}", profile.symtab.len());
-        println!("Maximum function count: ?");
-        println!("Maximum internal block count: ?");
+        println!("Total functions: {}", summary.num_functions());
+        println!("Maximum function count: {}", summary.max_function_count());
+        println!(
+            "Maximum internal block count: {}",
+            summary.max_internal_block_count()
+        );
         Ok(())
     }
 }

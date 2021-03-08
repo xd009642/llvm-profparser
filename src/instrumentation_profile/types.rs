@@ -9,7 +9,7 @@ const VARIANT_MASK_IR_PROF: u64 = 1u64 << 56;
 const VARIANT_MASK_CSIR_PROF: u64 = 1u64 << 57;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Ord, PartialOrd, Hash)]
-pub enum InstrumentationProfileValueKind {
+pub enum ValueKind {
     IndirectCallTarget = 0,
     MemOpSize = 1,
 }
@@ -85,8 +85,8 @@ pub struct NamedInstrProfRecord {
 }
 
 impl NamedInstrProfRecord {
-    pub fn num_value_sites(&self, valuekind: InstrumentationProfileValueKind) -> usize {
-        use InstrumentationProfileValueKind::*;
+    pub fn num_value_sites(&self, valuekind: ValueKind) -> usize {
+        use ValueKind::*;
         let record_data = self.record.data.as_ref();
         match valuekind {
             IndirectCallTarget => record_data.map(|x| x.indirect_callsites.len()),
