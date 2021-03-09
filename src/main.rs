@@ -2,6 +2,8 @@ use llvm_profparser::instrumentation_profile::stats::*;
 use llvm_profparser::instrumentation_profile::summary::*;
 use llvm_profparser::instrumentation_profile::types::*;
 use llvm_profparser::parse;
+use std::cmp::Ordering;
+use std::collections::binary_heap::BinaryHeap;
 use std::path::PathBuf;
 use structopt::StructOpt;
 
@@ -61,11 +63,11 @@ pub struct ShowCommand {
     output: Option<String>,
     /// Show the list of functions with the largest internal counts
     #[structopt(long = "topn")]
-    topn: Option<usize>,
+    topn: Option<u64>,
     /// Set the count value cutoff. Functions with the maximum count less than
     /// this value will not be printed out. (Default is 0)
-    #[structopt(long = "value_cutoff")]
-    value_cutoff: Option<usize>,
+    #[structopt(long = "value_cutoff", default_value = "0")]
+    value_cutoff: u64,
     /// Set the count value cutoff. Functions with the maximum count below the
     /// cutoff value
     #[structopt(long = "only_list_below")]
@@ -91,9 +93,9 @@ pub struct MergeCommand {
 
 #[derive(Clone, Debug, Eq, PartialEq, StructOpt)]
 pub struct OverlapCommand {
-    #[structopt(name = "<base-profile-file>")]
+    #[structopt(name = "<base profile file>")]
     base_file: PathBuf,
-    #[structopt(name = "<base-profile-file>")]
+    #[structopt(name = "<test profile file>")]
     test_file: PathBuf,
     #[structopt(long = "output", short = "o")]
     output: Option<PathBuf>,
@@ -122,6 +124,31 @@ fn check_function(name: Option<&String>, pattern: Option<&String>) -> bool {
     }
 }
 
+#[derive(Clone, Debug, Eq)]
+struct HotFn {
+    name: String,
+    count: u64,
+}
+
+impl PartialOrd for HotFn {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for HotFn {
+    fn cmp(&self, other: &Self) -> Ordering {
+        // Do the reverse here
+        self.count.cmp(&other.count)
+    }
+}
+
+impl PartialEq for HotFn {
+    fn eq(&self, other: &Self) -> bool {
+        self.count == other.count
+    }
+}
+
 impl ShowCommand {
     pub fn run(&self) -> Result<(), Box<dyn std::error::Error>> {
         let profile = parse(&self.input)?;
@@ -129,7 +156,9 @@ impl ShowCommand {
         let mut stats = vec![ValueSiteStats::default(); ValueKind::len()];
 
         let is_ir_instr = profile.is_ir_level_profile();
+        let mut hotties = BinaryHeap::with_capacity(self.topn.unwrap_or_default() as usize);
         let mut shown_funcs = 0;
+        let mut below_cutoff_funcs = 0;
         for func in &profile.records {
             if func.name.is_none() || func.hash.is_none() {
                 continue;
@@ -139,7 +168,40 @@ impl ShowCommand {
             }
             let show =
                 self.all_functions || check_function(func.name.as_ref(), self.function.as_ref());
+
+            if show && self.text {
+                // TODO text format dump
+                continue;
+            }
             summary.add_record(&func.record);
+
+            let (func_max, func_sum) = func
+                .counts()
+                .iter()
+                .fold((0, 0), |acc, x| (*x.max(&acc.0), acc.1 + x));
+            if func_max < self.value_cutoff {
+                below_cutoff_funcs += 1;
+                if self.only_list_below {
+                    println!(
+                        "  {}: (Max = {} Sum = {})",
+                        func.name.as_ref().unwrap(),
+                        func_max,
+                        func_sum
+                    );
+                    continue;
+                }
+            } else if self.only_list_below {
+                continue;
+            }
+            if let Some(topn) = self.topn {
+                hotties.push(HotFn {
+                    name: func.name.as_ref().unwrap().to_string(),
+                    count: func_max,
+                });
+                if hotties.len() > topn as usize {
+                    hotties.pop();
+                }
+            }
             if show {
                 if shown_funcs == 0 {
                     println!("Counters:");
@@ -147,9 +209,9 @@ impl ShowCommand {
                 shown_funcs += 1;
                 println!("  {}:", func.name.as_ref().unwrap());
                 println!("    Hash: 0x{:x}", func.hash.unwrap());
-                println!("    Counters: {}", func.record.counts.len());
+                println!("    Counters: {}", func.counts().len());
                 if !is_ir_instr {
-                    println!("    Function Count: {}", func.record.counts[0]);
+                    println!("    Function Count: {}", func.counts()[0]);
                 }
                 if self.ic_targets {
                     println!(
@@ -193,12 +255,31 @@ impl ShowCommand {
         println!("Instrumentation level: {}", profile.get_level());
         println!("Functions shown: {}", shown_funcs);
         println!("Total functions: {}", summary.num_functions());
+        if self.value_cutoff > 0 {
+            println!(
+                "Number of functions with maximum count (< {} ): {}",
+                self.value_cutoff, below_cutoff_funcs
+            );
+            println!(
+                "Number of functions with maximum count (>= {}): {}",
+                self.value_cutoff,
+                summary.num_functions() - below_cutoff_funcs
+            );
+        }
         println!("Maximum function count: {}", summary.max_function_count());
         println!(
             "Maximum internal block count: {}",
             summary.max_internal_block_count()
         );
-        if let Some(_topn) = self.topn {}
+        if let Some(topn) = self.topn {
+            println!(
+                "Top {} functions with the largest internal block counts: ",
+                topn
+            );
+            while let Some(f) = hotties.pop() {
+                println!("  {}, max count = {}", f.name, f.count);
+            }
+        }
 
         if self.ic_targets && shown_funcs > 0 {
             println!("Statistics for indirect call sites profile:");
