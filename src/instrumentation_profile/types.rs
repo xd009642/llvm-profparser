@@ -91,6 +91,9 @@ pub struct NamedInstrProfRecord {
 }
 
 impl NamedInstrProfRecord {
+    /// This bit is reserved as the flag for the context sensitive profile record
+    const CS_FLAG_IN_FUNC_HASH: u64 = 60;
+
     pub fn num_value_sites(&self, valuekind: ValueKind) -> usize {
         use ValueKind::*;
         let record_data = self.record.data.as_ref();
@@ -99,6 +102,16 @@ impl NamedInstrProfRecord {
             MemOpSize => record_data.map(|x| x.mem_op_sizes.len()),
         }
         .unwrap_or_default()
+    }
+
+    pub fn has_cs_flag(&self) -> bool {
+        let hash = self.hash.unwrap_or_default();
+        ((hash >> Self::CS_FLAG_IN_FUNC_HASH) & 1) != 0
+    }
+
+    pub fn set_cs_flag(&mut self) {
+        let x = self.hash.get_or_insert(0);
+        *x &= Self::CS_FLAG_IN_FUNC_HASH;
     }
 
     pub fn counts(&self) -> &[u64] {

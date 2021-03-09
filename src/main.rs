@@ -115,6 +115,13 @@ pub struct Opts {
     cmd: Command,
 }
 
+fn check_function(name: Option<&String>, pattern: Option<&String>) -> bool {
+    match pattern {
+        Some(pat) => name.map(|x| x.contains(pat)).unwrap_or(false),
+        None => false,
+    }
+}
+
 impl ShowCommand {
     pub fn run(&self) -> Result<(), Box<dyn std::error::Error>> {
         let profile = parse(&self.input)?;
@@ -123,53 +130,65 @@ impl ShowCommand {
 
         let is_ir_instr = profile.is_ir_level_profile();
         let mut shown_funcs = 0;
-        println!("Counters:");
         if self.all_functions {
             for func in &profile.records {
                 if func.name.is_none() || func.hash.is_none() {
                     continue;
                 }
+                if is_ir_instr && func.has_cs_flag() != self.showcs {
+                    continue;
+                }
+                let show = self.all_functions
+                    || check_function(func.name.as_ref(), self.function.as_ref());
                 summary.add_record(&func.record);
-                shown_funcs += 1;
-                println!("  {}:", func.name.as_ref().unwrap());
-                println!("    Hash: 0x{:x}", func.hash.unwrap());
-                println!("    Counters: {}", func.record.counts.len());
-                if !is_ir_instr {
-                    println!("    Function Count: {}", func.record.counts[0]);
-                }
-                if self.ic_targets {
-                    println!(
-                        "    Indirect Call Site Count: {}",
-                        func.num_value_sites(ValueKind::IndirectCallTarget)
-                    );
-                    stats[ValueKind::IndirectCallTarget as usize].traverse_sites(
-                        &func.record,
-                        ValueKind::IndirectCallTarget,
-                        Some(&profile.symtab),
-                    );
-                }
-                let num_memop_calls = func.num_value_sites(ValueKind::MemOpSize);
-                if self.memop_sizes && num_memop_calls > 0 {
-                    println!("    Number of Memory Intrinsics Calls: {}", num_memop_calls);
-                    stats[ValueKind::MemOpSize as usize].traverse_sites(
-                        &func.record,
-                        ValueKind::MemOpSize,
-                        None,
-                    );
-                }
-                if self.show_counts {
-                    let start = if is_ir_instr { 0 } else { 1 };
-                    let counts = func
-                        .counts()
-                        .iter()
-                        .skip(start)
-                        .map(|x| x.to_string())
-                        .collect::<Vec<String>>()
-                        .join(",");
-                    println!("    Block counts: [{}]", counts);
-                }
-                if self.ic_targets {
-                    println!("    Indirect Target Results:");
+                if show {
+                    if shown_funcs == 0 {
+                        println!("Counters:");
+                    }
+                    shown_funcs += 1;
+                    println!("  {}:", func.name.as_ref().unwrap());
+                    println!("    Hash: 0x{:x}", func.hash.unwrap());
+                    println!("    Counters: {}", func.record.counts.len());
+                    if !is_ir_instr {
+                        println!("    Function Count: {}", func.record.counts[0]);
+                    }
+                    if self.ic_targets {
+                        println!(
+                            "    Indirect Call Site Count: {}",
+                            func.num_value_sites(ValueKind::IndirectCallTarget)
+                        );
+                        stats[ValueKind::IndirectCallTarget as usize].traverse_sites(
+                            &func.record,
+                            ValueKind::IndirectCallTarget,
+                            Some(&profile.symtab),
+                        );
+                    }
+                    let num_memop_calls = func.num_value_sites(ValueKind::MemOpSize);
+                    if self.memop_sizes && num_memop_calls > 0 {
+                        println!("    Number of Memory Intrinsics Calls: {}", num_memop_calls);
+                        stats[ValueKind::MemOpSize as usize].traverse_sites(
+                            &func.record,
+                            ValueKind::MemOpSize,
+                            None,
+                        );
+                    }
+                    if self.show_counts {
+                        let start = if is_ir_instr { 0 } else { 1 };
+                        let counts = func
+                            .counts()
+                            .iter()
+                            .skip(start)
+                            .map(|x| x.to_string())
+                            .collect::<Vec<String>>()
+                            .join(",");
+                        println!("    Block counts: [{}]", counts);
+                    }
+                    if self.ic_targets {
+                        println!("    Indirect Target Results:");
+                    }
+                    if self.memop_sizes && num_memop_calls > 0 {
+                        println!("    Memory Intrinsic Size Results:");
+                    }
                 }
             }
         }
