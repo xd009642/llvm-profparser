@@ -11,14 +11,20 @@ pub enum Command {
         #[structopt(flatten)]
         show: ShowCommand,
     },
-    Merge,
-    Overlap,
+    Merge {
+        #[structopt(flatten)]
+        merge: MergeCommand,
+    },
+    Overlap {
+        #[structopt(flatten)]
+        overlap: OverlapCommand,
+    },
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, StructOpt)]
 pub struct ShowCommand {
     /// Input profraw file to show some information about
-    #[structopt(name = "input", long = "input", short = "i")]
+    #[structopt(name = "<filename...>", long = "input", short = "i")]
     input: PathBuf,
     /// Show counter values for shown functions
     #[structopt(long = "counts")]
@@ -71,6 +77,36 @@ pub struct ShowCommand {
     /// only usable when the sample profile is in extbinary format
     #[structopt(long = "show_section_info_only")]
     show_section_info_only: bool,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, StructOpt)]
+pub struct MergeCommand {
+    /// Input files to merge
+    #[structopt(name = "input", long = "input", short = "i")]
+    input: Vec<PathBuf>,
+    /// Number of merge threads to use (will autodetect by default)
+    #[structopt(long = "num-threads", short = "j")]
+    jobs: Option<usize>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, StructOpt)]
+pub struct OverlapCommand {
+    #[structopt(name = "<base-profile-file>")]
+    base_file: PathBuf,
+    #[structopt(name = "<base-profile-file>")]
+    test_file: PathBuf,
+    #[structopt(long = "output", short = "o")]
+    output: Option<PathBuf>,
+    /// For context sensitive counts
+    #[structopt(long = "cs")]
+    context_sensitive_counts: bool,
+    /// Function level overlap information for every function in test profile with max count value
+    /// greater than the parameter value
+    #[structopt(long = "value-cutoff")]
+    value_cutoff: Option<usize>,
+    /// Function level overlap information for matching functions
+    #[structopt(long = "function")]
+    function: Option<String>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, StructOpt)]
