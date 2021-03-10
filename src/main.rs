@@ -3,7 +3,7 @@ use llvm_profparser::instrumentation_profile::summary::*;
 use llvm_profparser::instrumentation_profile::types::*;
 use llvm_profparser::parse;
 use std::cmp::Ordering;
-use std::collections::binary_heap::BinaryHeap;
+use std::collections::BinaryHeap;
 use std::path::PathBuf;
 use structopt::StructOpt;
 
@@ -63,7 +63,7 @@ pub struct ShowCommand {
     output: Option<String>,
     /// Show the list of functions with the largest internal counts
     #[structopt(long = "topn")]
-    topn: Option<u64>,
+    topn: Option<usize>,
     /// Set the count value cutoff. Functions with the maximum count less than
     /// this value will not be printed out. (Default is 0)
     #[structopt(long = "value_cutoff", default_value = "0")]
@@ -139,7 +139,7 @@ impl PartialOrd for HotFn {
 impl Ord for HotFn {
     fn cmp(&self, other: &Self) -> Ordering {
         // Do the reverse here
-        self.count.cmp(&other.count)
+        other.count.cmp(&self.count)
     }
 }
 
@@ -156,9 +156,11 @@ impl ShowCommand {
         let mut stats = vec![ValueSiteStats::default(); ValueKind::len()];
 
         let is_ir_instr = profile.is_ir_level_profile();
-        let mut hotties = BinaryHeap::with_capacity(self.topn.unwrap_or_default() as usize);
+        let mut hotties =
+            BinaryHeap::<HotFn>::with_capacity(self.topn.unwrap_or_default() as usize);
         let mut shown_funcs = 0;
         let mut below_cutoff_funcs = 0;
+        let topn = self.topn.unwrap_or_default();
         for func in &profile.records {
             if func.name.is_none() || func.hash.is_none() {
                 continue;
@@ -193,13 +195,21 @@ impl ShowCommand {
             } else if self.only_list_below {
                 continue;
             }
-            if let Some(topn) = self.topn {
-                hotties.push(HotFn {
-                    name: func.name.as_ref().unwrap().to_string(),
-                    count: func_max,
-                });
-                if hotties.len() > topn as usize {
-                    hotties.pop();
+            if topn > 0 {
+                if hotties.len() == topn {
+                    let top = hotties.peek().unwrap();
+                    if top.count < func_max {
+                        hotties.pop();
+                        hotties.push(HotFn {
+                            name: func.name.as_ref().unwrap().to_string(),
+                            count: func_max,
+                        });
+                    }
+                } else {
+                    hotties.push(HotFn {
+                        name: func.name.as_ref().unwrap().to_string(),
+                        count: func_max,
+                    });
                 }
             }
             if show {
@@ -276,7 +286,8 @@ impl ShowCommand {
                 "Top {} functions with the largest internal block counts: ",
                 topn
             );
-            while let Some(f) = hotties.pop() {
+            let hotties = hotties.into_sorted_vec();
+            for f in hotties.iter() {
                 println!("  {}, max count = {}", f.name, f.count);
             }
         }
