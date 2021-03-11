@@ -84,8 +84,9 @@ pub struct ShowCommand {
 #[derive(Clone, Debug, Eq, PartialEq, StructOpt)]
 pub struct MergeCommand {
     /// Input files to merge
-    #[structopt(name = "input", long = "input", short = "i")]
+    #[structopt(name = "<filename...>", long = "input", short = "i")]
     input: Vec<PathBuf>,
+    weighted_input: Vec<(u64, PathBuf)>,
     /// Number of merge threads to use (will autodetect by default)
     #[structopt(long = "num-threads", short = "j")]
     jobs: Option<usize>,
@@ -115,6 +116,10 @@ pub struct OverlapCommand {
 pub struct Opts {
     #[structopt(subcommand)]
     cmd: Command,
+}
+
+fn try_parse_weighted(input: &str) -> Result<(u64, PathBuf), String> {
+    todo!()
 }
 
 fn check_function(name: Option<&String>, pattern: Option<&String>) -> bool {
