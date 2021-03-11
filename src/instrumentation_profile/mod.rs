@@ -1,3 +1,4 @@
+use crate::instrumentation_profile::indexed_profile::*;
 use crate::instrumentation_profile::raw_profile::*;
 use crate::instrumentation_profile::types::*;
 use nom::IResult;
@@ -6,6 +7,7 @@ use std::io;
 use std::io::prelude::*;
 use std::path::Path;
 
+pub mod indexed_profile;
 pub mod raw_profile;
 pub mod stats;
 pub mod summary;
@@ -20,8 +22,6 @@ pub struct Header {
     version: u32,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
-pub struct IndexedInstrProf;
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub struct TextInstrProf;
 
@@ -58,28 +58,6 @@ pub trait InstrProfReader {
     /// Detects that the bytes match the current reader format if it can't read the format it will
     /// return false
     fn has_format(input: impl Read) -> bool;
-}
-
-impl InstrProfReader for IndexedInstrProf {
-    type Header = Header;
-
-    fn parse_bytes(input: &[u8]) -> IResult<&[u8], InstrumentationProfile> {
-        todo!()
-    }
-
-    fn parse_header(input: &[u8]) -> IResult<&[u8], Self::Header> {
-        todo!()
-    }
-
-    fn has_format(mut input: impl Read) -> bool {
-        const MAGIC: [u8; 8] = [0xff, 0x6c, 0x70, 0x72, 0x6f, 0x66, 0x69, 0x81];
-        let mut buffer: [u8; 8] = [0; 8];
-        if input.read_exact(&mut buffer).is_ok() {
-            buffer == MAGIC
-        } else {
-            false
-        }
-    }
 }
 
 impl InstrProfReader for TextInstrProf {
