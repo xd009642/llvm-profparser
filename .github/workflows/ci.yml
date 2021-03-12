@@ -25,10 +25,12 @@ jobs:
           override: true
           components: rustfmt, llvm-tools
       - name: build
-        run: cargo check --no-default-features
-        run: cargo check --all-features
+        run: |
+          cargo check --no-default-features
+          cargo check --all-features
       - name: test
-        run: cargo install cargo-binutils
-        run: cargo test 
+        run: |
+          cargo install cargo-binutils
+          cargo test 
       - name: check formatting
         run: cargo fmt -- --check
