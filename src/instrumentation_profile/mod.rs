@@ -1,5 +1,6 @@
 use crate::instrumentation_profile::indexed_profile::*;
 use crate::instrumentation_profile::raw_profile::*;
+use crate::instrumentation_profile::text_profile::*;
 use crate::instrumentation_profile::types::*;
 use nom::IResult;
 use std::fs::File;
@@ -11,6 +12,7 @@ pub mod indexed_profile;
 pub mod raw_profile;
 pub mod stats;
 pub mod summary;
+pub mod text_profile;
 pub mod types;
 
 pub const fn get_num_padding_bytes(len: u64) -> u8 {
@@ -21,9 +23,6 @@ pub const fn get_num_padding_bytes(len: u64) -> u8 {
 pub struct Header {
     version: u32,
 }
-
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
-pub struct TextInstrProf;
 
 pub fn parse(filename: impl AsRef<Path>) -> io::Result<InstrumentationProfile> {
     let mut buffer = Vec::new();
@@ -58,26 +57,4 @@ pub trait InstrProfReader {
     /// Detects that the bytes match the current reader format if it can't read the format it will
     /// return false
     fn has_format(input: impl Read) -> bool;
-}
-
-impl InstrProfReader for TextInstrProf {
-    type Header = Header;
-    fn parse_bytes(input: &[u8]) -> IResult<&[u8], InstrumentationProfile> {
-        todo!()
-    }
-
-    fn parse_header(input: &[u8]) -> IResult<&[u8], Self::Header> {
-        todo!()
-    }
-
-    fn has_format(mut input: impl Read) -> bool {
-        // looking at the code it looks like with file memory buffers in llvm it sets the buffer
-        // size to the size of the file meaning it checks all the characters
-        let mut s = String::new();
-        if input.read_to_string(&mut s).is_ok() {
-            s.is_ascii()
-        } else {
-            false
-        }
-    }
 }
