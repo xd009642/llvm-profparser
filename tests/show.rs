@@ -20,6 +20,7 @@ fn show_profraws() {
     // TODO we should consider doing different permutations of args. Some things which rely on
     // the ordering of elements in a priority_queue etc will display differently though...
     let data = get_data_dir();
+    println!("Data directory: {}", data.display());
     let ext = OsStr::new("profraw");
     let mut count = 0;
     for raw_file in read_dir(&data)
