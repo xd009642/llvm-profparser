@@ -5,6 +5,7 @@ authors = ["xd009642 <danielmckenna93@gmail.com>"]
 edition = "2018"
 
 [features]
+default = ["cli"]
 cli = ["structopt"]
 
 [dependencies]
@@ -17,3 +18,7 @@ structopt = { version = "0.3.21", optional = true }
 [[bin]]
 name = "llvm_profparser"
 required-features = ["cli"]
+
+[dev-dependencies]
+assert_cmd = "1"
+pretty_assertions = "0.7"

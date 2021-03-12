@@ -86,6 +86,8 @@ pub struct MergeCommand {
     /// Input files to merge
     #[structopt(name = "<filename...>", long = "input", short = "i")]
     input: Vec<PathBuf>,
+    /// List of weights and filenames in `<weight>,<filename>` format
+    #[structopt(long = "weighted-input", parse(try_from_str=try_parse_weighted))]
     weighted_input: Vec<(u64, PathBuf)>,
     /// Number of merge threads to use (will autodetect by default)
     #[structopt(long = "num-threads", short = "j")]
@@ -223,10 +225,10 @@ impl ShowCommand {
                 }
                 shown_funcs += 1;
                 println!("  {}:", func.name.as_ref().unwrap());
-                println!("    Hash: 0x{:x}", func.hash.unwrap());
+                println!("    Hash: {:#018x}", func.hash.unwrap());
                 println!("    Counters: {}", func.counts().len());
                 if !is_ir_instr {
-                    println!("    Function Count: {}", func.counts()[0]);
+                    println!("    Function count: {}", func.counts()[0]);
                 }
                 if self.ic_targets {
                     println!(
@@ -268,7 +270,9 @@ impl ShowCommand {
             }
         }
         println!("Instrumentation level: {}", profile.get_level());
-        println!("Functions shown: {}", shown_funcs);
+        if self.all_functions || self.function.is_some() {
+            println!("Functions shown: {}", shown_funcs);
+        }
         println!("Total functions: {}", summary.num_functions());
         if self.value_cutoff > 0 {
             println!(
