@@ -23,7 +23,7 @@ jobs:
         with:
           toolchain: ${{ matrix.version }}
           override: true
-          components: rustfmt, llvm-tools
+          components: rustfmt, llvm-tools-preview
       - name: build
         run: |
           cargo check --no-default-features
