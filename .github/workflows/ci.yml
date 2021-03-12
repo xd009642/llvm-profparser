@@ -37,5 +37,5 @@ jobs:
       - name: code-coverage
         run: |
           cargo install cargo-tarpaulin --force --git https://github.com/xd009642/tarpaulin --branch develop
-          cargo tarpaulin --follow-exec --coveralls ${{ secrets.GITHUB_TOKEN }}  --ciserver travis-ci
+          cargo tarpaulin --force-clean --follow-exec --coveralls ${{ secrets.GITHUB_TOKEN }}  --ciserver travis-ci
         if: matrix.target == 'x86_64-unknown-linux-gnu' && matrix.version == 'nightly'
