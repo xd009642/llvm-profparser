@@ -19,16 +19,18 @@ pub struct Symtab {
     pub names: BTreeMap<u64, String>,
 }
 
+pub fn compute_hash(data: impl AsRef<[u8]>) -> u64 {
+    let hash = md5::compute(data).0[..8].try_into().unwrap_or_default();
+    u64::from_ne_bytes(hash)
+}
+
 impl Symtab {
     pub fn len(&self) -> usize {
         self.names.len()
     }
-}
 
-impl Symtab {
     pub fn add_func_name(&mut self, name: String) {
-        let hash = md5::compute(&name).0[..8].try_into().unwrap();
-        let hash = u64::from_ne_bytes(hash);
+        let hash = compute_hash(&name);
         self.names.insert(hash, name);
     }
 }
@@ -131,8 +133,8 @@ type InstrProfValueSiteRecord = Vec<InstrProfValueData>;
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub struct InstrProfValueData {
-    value: u64,
-    count: u64,
+    pub value: u64,
+    pub count: u64,
 }
 
 #[derive(Clone, Debug)]

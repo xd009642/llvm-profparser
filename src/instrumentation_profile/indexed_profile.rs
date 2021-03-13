@@ -1,7 +1,6 @@
-use crate::instrumentation_profile::types::*;
 use crate::instrumentation_profile::*;
 use nom::IResult;
-use std::io::prelude::*;
+use std::io::Read;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub struct IndexedInstrProf;
@@ -9,11 +8,11 @@ pub struct IndexedInstrProf;
 impl InstrProfReader for IndexedInstrProf {
     type Header = Header;
 
-    fn parse_bytes(input: &[u8]) -> IResult<&[u8], InstrumentationProfile> {
+    fn parse_bytes(_input: &[u8]) -> IResult<&[u8], InstrumentationProfile> {
         todo!()
     }
 
-    fn parse_header(input: &[u8]) -> IResult<&[u8], Self::Header> {
+    fn parse_header(_input: &[u8]) -> IResult<&[u8], Self::Header> {
         todo!()
     }
 
