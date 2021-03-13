@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use std::convert::TryInto;
 use std::fmt;
@@ -32,6 +33,10 @@ impl Symtab {
     pub fn add_func_name(&mut self, name: String) {
         let hash = compute_hash(&name);
         self.names.insert(hash, name);
+    }
+
+    pub fn contains(&self, hash: u64) -> bool {
+        self.names.contains_key(&hash)
     }
 }
 
@@ -79,6 +84,24 @@ impl InstrumentationProfile {
             InstrumentationLevel::FrontEnd
         }
     }
+
+    pub fn merge(&mut self, other: &Self) {
+        for func in &other.records {
+            self.merge_record(&func);
+        }
+    }
+
+    pub fn merge_record(&mut self, record: &NamedInstrProfRecord) {
+        if self.symtab.contains(record.hash_unchecked()) {
+            // Find the record and merge tings
+        } else {
+            self.symtab
+                .names
+                .insert(record.hash_unchecked(), record.name_unchecked());
+            // Insert the record
+        }
+        todo!();
+    }
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Hash, Ord, PartialOrd)]
@@ -115,6 +138,14 @@ impl NamedInstrProfRecord {
     pub fn counts(&self) -> &[u64] {
         &self.record.counts
     }
+
+    pub fn hash_unchecked(&self) -> u64 {
+        self.hash.unwrap_or_default()
+    }
+
+    pub fn name_unchecked(&self) -> String {
+        self.name.clone().unwrap_or_default()
+    }
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Hash, Ord, PartialOrd)]
@@ -131,14 +162,33 @@ pub struct ValueProfDataRecord {
 
 type InstrProfValueSiteRecord = Vec<InstrProfValueData>;
 
-#[derive(Clone, Debug, Default, Eq, PartialEq, Hash, Ord, PartialOrd)]
+#[derive(Clone, Debug, Default, Eq, Hash)]
 pub struct InstrProfValueData {
     pub value: u64,
     pub count: u64,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ValueProfData {
     total_size: u32,
     num_value_kinds: u32,
+}
+
+impl PartialOrd for InstrProfValueData {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for InstrProfValueData {
+    fn cmp(&self, other: &Self) -> Ordering {
+        // Do the reverse here
+        self.value.cmp(&self.value)
+    }
+}
+
+impl PartialEq for InstrProfValueData {
+    fn eq(&self, other: &Self) -> bool {
+        self.value == other.value
+    }
 }

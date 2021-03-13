@@ -86,6 +86,9 @@ pub struct MergeCommand {
     /// Input files to merge
     #[structopt(name = "<filename...>", long = "input", short = "i")]
     input: Vec<PathBuf>,
+    /// Output file
+    #[structopt(long = "output", short = "o")]
+    output: PathBuf,
     /// List of weights and filenames in `<weight>,<filename>` format
     #[structopt(long = "weighted-input", parse(try_from_str=try_parse_weighted))]
     weighted_input: Vec<(u64, PathBuf)>,
@@ -112,6 +115,9 @@ pub struct OverlapCommand {
     /// Function level overlap information for matching functions
     #[structopt(long = "function")]
     function: Option<String>,
+    /// Generate a sparse profile
+    #[structopt(long = "sparse")]
+    sparse: bool,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, StructOpt)]
@@ -319,10 +325,30 @@ impl ShowCommand {
     }
 }
 
+impl MergeCommand {
+    fn run(&self) -> Result<(), Box<dyn std::error::Error>> {
+        assert!(
+            !self.input.is_empty(),
+            "No input files selected. See merge --help"
+        );
+        let mut profiles = vec![];
+        for input in &self.input {
+            let profile = parse(&input)?;
+            profiles.push(profile);
+        }
+        let mut base = profiles.remove(0);
+        for profile in &profiles {
+            base.merge(profile);
+        }
+        Ok(())
+    }
+}
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let opts = Opts::from_args();
     match opts.cmd {
         Command::Show { show } => show.run(),
+        Command::Merge { merge } => merge.run(),
         _ => {
             panic!("Unsupported command");
         }
