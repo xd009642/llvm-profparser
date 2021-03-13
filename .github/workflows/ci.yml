@@ -12,7 +12,9 @@ jobs:
         version:
           - stable
           - beta
-          - nightly
+        # So nightly updates the tools more frequently and without means to introspect
+        # versions via the profdata CLI I can't handle both printout formats 
+        #  - nightly 
         target:
           - x86_64-unknown-linux-gnu
           - x86_64-unknown-linux-musl
