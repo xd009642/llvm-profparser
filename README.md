@@ -1,6 +1,6 @@
 # llvm-profparser
 
-[![Build Status](https://github.com/xd009642/llvm_profparser/workflows/Build/badge.svg)](https://github.com/xd009642/llvm_profparser/actions)
+[![Build Status](https://github.com/xd009642/llvm-profparser/workflows/Build/badge.svg)](https://github.com/xd009642/llvm-profparser/actions)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Coverage Status](https://coveralls.io/repos/github/xd009642/llvm-profparser/badge.svg?branch=master)](https://coveralls.io/github/xd009642/llvm-profparser?branch=master)
 
