@@ -70,6 +70,7 @@ impl InstrProfReader for TextInstrProf {
         let (bytes, header) = Self::parse_header(input)?;
         let (bytes, _) = skip_to_content(bytes)?;
         input = bytes;
+        let mut result = InstrumentationProfile::default();
         while !input.is_empty() {
             // function name (demangled)
             let (bytes, name) = read_line(input)?;
@@ -99,8 +100,17 @@ impl InstrProfReader for TextInstrProf {
                     }
                 }
             }
+            let record = InstrProfRecord {
+                counts: counters,
+                data: None,
+            };
+            result.records.push(NamedInstrProfRecord {
+                name: std::str::from_utf8(name).map(|x| x.to_string()).ok(),
+                hash: Some(hash),
+                record,
+            });
         }
-        todo!()
+        Ok((bytes, result))
     }
 
     fn parse_header(input: &[u8]) -> IResult<&[u8], Self::Header> {
