@@ -1,5 +1,6 @@
 use crate::instrumentation_profile::types::*;
 use crate::instrumentation_profile::InstrProfReader;
+use nom::character::is_digit;
 use nom::error::{Error, ErrorKind};
 use nom::*;
 use std::io::Read;
@@ -26,13 +27,26 @@ fn check_tag(data: &[u8], tag: &[u8]) -> bool {
     }
 }
 
+fn str_to_digit(bytes: &[u8]) -> u64 {
+    // As I'm only using this on lines nom identifies as just digits it won't fail
+    std::str::from_utf8(bytes)
+        .unwrap()
+        .parse()
+        .unwrap_or_default()
+}
+
+fn valid_name_char(character: u8) -> bool {
+    let c = character as char;
+    c.is_ascii() && !c.is_ascii_whitespace()
+}
+
 named!(strip_whitespace<&[u8], ()>, map!(one_of!(&b" \n\r\t"[..]), |_|()));
 
 named!(strip_comments<&[u8], ()>,
     map!(delimited!(tag!(b"#"), take_until!("\n"), tag!("\n")), |_|())
 );
 
-named!(skip_to_content<&[u8], ()>, map!(many0!(alt!(strip_whitespace| strip_comments)), |_|()));
+named!(skip_to_content<&[u8], ()>, map!(many0!(alt!(strip_whitespace | strip_comments)), |_|()));
 
 named!(
     parse_header<&[u8], Option<&[u8]>>,
@@ -43,18 +57,48 @@ named!(
     ))
 );
 
+named!(
+    read_line,
+    map!(tuple!(take_while1!(valid_name_char), tag!(b"\n")), |x| x.0)
+);
+
+named!(read_digit<&[u8], u64>, map!(tuple!(take_while1!(is_digit), tag!(b"\n")), |x| str_to_digit(x.0)));
+
 impl InstrProfReader for TextInstrProf {
     type Header = Header;
     fn parse_bytes(mut input: &[u8]) -> IResult<&[u8], InstrumentationProfile> {
         let (bytes, header) = Self::parse_header(input)?;
         let (bytes, _) = skip_to_content(bytes)?;
         input = bytes;
-        println!("Got header: {:?}", header);
         while !input.is_empty() {
-            // function name
+            // function name (demangled)
+            let (bytes, name) = read_line(input)?;
+            let (bytes, _) = skip_to_content(bytes)?;
             // function hash
+            let (bytes, hash) = read_digit(bytes)?;
+            let (bytes, _) = skip_to_content(bytes)?;
             // number of counters
+            let (bytes, num_counters) = read_digit(bytes)?;
+            let (bytes, _) = skip_to_content(bytes)?;
+            let mut counters = vec![];
             // counter values
+            input = bytes;
+            for i in 0..num_counters {
+                let (bytes, counter) = read_digit(input)?;
+                counters.push(counter);
+                match skip_to_content(bytes) {
+                    Ok((bytes, _)) => {
+                        input = bytes;
+                    }
+                    Err(_) if i + 1 == num_counters => {
+                        input = &bytes[(bytes.len())..];
+                        break;
+                    }
+                    Err(e) => {
+                        Err(e)?;
+                    }
+                }
+            }
         }
         todo!()
     }
@@ -149,5 +193,16 @@ mod tests {
         let bad_header = b"# CSIR flag\n:CSI\n";
         let header = TextInstrProf::parse_header(&bad_header[..]);
         assert!(header.is_err(), "Valid header: {:?}", header);
+    }
+
+    #[test]
+    fn content_strip() {
+        let empty = b"\n";
+        let (bytes, _) = strip_whitespace(empty).unwrap();
+        assert_eq!(bytes.len(), 0);
+
+        let comment = b"# I am a comment\n";
+        let (bytes, _) = strip_comments(comment).unwrap();
+        assert_eq!(bytes.len(), 0);
     }
 }
