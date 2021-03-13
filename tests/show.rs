@@ -15,12 +15,10 @@ fn get_printout(output: &[u8]) -> Vec<String> {
         .collect()
 }
 
-#[test]
-fn show_profraws() {
+fn check_command(ext: &OsStr) {
     // TODO we should consider doing different permutations of args. Some things which rely on
     // the ordering of elements in a priority_queue etc will display differently though...
     let data = get_data_dir();
-    let ext = OsStr::new("profraw");
     let mut count = 0;
     for raw_file in read_dir(&data)
         .unwrap()
@@ -37,6 +35,7 @@ fn show_profraws() {
             .expect("cargo binutils or llvm-profdata is not installed");
 
         if llvm.status.success() {
+            println!("Checking {:?}", raw_file.file_name());
             count += 1;
             let rust = assert_cmd::Command::cargo_bin("llvm_profparser")
                 .unwrap()
@@ -49,10 +48,19 @@ fn show_profraws() {
 
             assert_eq!(get_printout(&llvm.stdout), get_printout(&rust.stdout));
             assert_eq!(get_printout(&llvm.stderr), get_printout(&rust.stderr));
-        } else {
-            println!("Skipping {:?}", raw_file.file_name());
-            println!("{}", String::from_utf8_lossy(&llvm.stderr));
         }
     }
     assert!(count > 0);
+}
+
+#[test]
+fn show_profraws() {
+    let ext = OsStr::new("profraw");
+    check_command(&ext);
+}
+
+#[test]
+fn show_proftexts() {
+    let ext = OsStr::new("proftext");
+    check_command(&ext);
 }

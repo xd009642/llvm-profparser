@@ -159,6 +159,7 @@ impl PartialEq for HotFn {
 impl ShowCommand {
     pub fn run(&self) -> Result<(), Box<dyn std::error::Error>> {
         let profile = parse(&self.input)?;
+        //println!("{:?}", profile);
         let mut summary = ProfileSummary::new();
         let mut stats = vec![ValueSiteStats::default(); ValueKind::len()];
 
@@ -184,10 +185,9 @@ impl ShowCommand {
             }
             summary.add_record(&func.record);
 
-            let (func_max, func_sum) = func
-                .counts()
-                .iter()
-                .fold((0, 0), |acc, x| (*x.max(&acc.0), acc.1 + x));
+            let (func_max, func_sum) = func.counts().iter().fold((0, 0u64), |acc, x| {
+                (*x.max(&acc.0), acc.1.saturating_add(*x))
+            });
             if func_max < self.value_cutoff {
                 below_cutoff_funcs += 1;
                 if self.only_list_below {

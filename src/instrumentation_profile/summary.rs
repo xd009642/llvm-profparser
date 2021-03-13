@@ -17,20 +17,18 @@ impl ProfileSummary {
     }
 
     pub fn add_record(&mut self, record: &InstrProfRecord) {
-        self.num_functions += 1;
-        if record.counts.len() > 1 {
+        if !record.counts.is_empty() {
+            self.num_functions += 1;
             self.add_count(record.counts[0]);
             if record.counts[0] > self.max_function_count {
                 self.max_function_count = record.counts[0];
             }
             self.add_internal_counts(&record.counts[1..]);
-        } else {
-            // something is wrong here...
         }
     }
 
     fn add_count(&mut self, count: u64) {
-        self.total_count += count;
+        self.total_count.saturating_add(count);
         if count > self.max_count {
             self.max_count = count;
         }
