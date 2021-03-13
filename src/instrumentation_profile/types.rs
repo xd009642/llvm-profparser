@@ -2,12 +2,6 @@ use std::collections::BTreeMap;
 use std::convert::TryInto;
 use std::fmt;
 
-const VARIANT_MASKS_ALL: u64 = 0xff00_0000_0000_0000;
-/// This is taken from `llvm/include/llvm/ProfileData/InstrProfileData.inc`
-const VARIANT_MASK_IR_PROF: u64 = 1u64 << 56;
-/// This is taken from `llvm/include/llvm/ProfileData/InstrProfileData.inc`
-const VARIANT_MASK_CSIR_PROF: u64 = 1u64 << 57;
-
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Ord, PartialOrd, Hash)]
 pub enum ValueKind {
     IndirectCallTarget = 0,
@@ -56,22 +50,24 @@ impl fmt::Display for InstrumentationLevel {
 
 #[derive(Debug, Default, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub struct InstrumentationProfile {
-    pub(crate) version: u64,
+    pub(crate) version: Option<u64>,
+    pub(crate) has_csir: bool,
+    pub(crate) is_ir: bool,
     pub records: Vec<NamedInstrProfRecord>,
     pub symtab: Symtab,
 }
 
 impl InstrumentationProfile {
-    pub fn version(&self) -> u64 {
-        self.version & !VARIANT_MASKS_ALL
+    pub fn version(&self) -> Option<u64> {
+        self.version
     }
 
     pub fn is_ir_level_profile(&self) -> bool {
-        (self.version & VARIANT_MASK_IR_PROF) != 0
+        self.is_ir
     }
 
     pub fn has_csir_level_profile(&self) -> bool {
-        (self.version & VARIANT_MASK_CSIR_PROF) != 0
+        self.has_csir
     }
 
     pub fn get_level(&self) -> InstrumentationLevel {

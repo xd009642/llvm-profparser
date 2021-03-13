@@ -70,7 +70,11 @@ impl InstrProfReader for TextInstrProf {
         let (bytes, header) = Self::parse_header(input)?;
         let (bytes, _) = skip_to_content(bytes)?;
         input = bytes;
-        let mut result = InstrumentationProfile::default();
+        let mut result = InstrumentationProfile {
+            has_csir: header.has_csir,
+            is_ir: header.is_ir_level,
+            ..Default::default()
+        };
         while !input.is_empty() {
             // function name (demangled)
             let (bytes, name) = read_line(input)?;
