@@ -94,11 +94,16 @@ impl InstrumentationProfile {
     pub fn merge_record(&mut self, record: &NamedInstrProfRecord) {
         if self.symtab.contains(record.hash_unchecked()) {
             // Find the record and merge tings
+            if let Some(rec) = self.records.iter_mut().find(|x| x.name == record.name) {
+                rec.record.merge(&record.record);
+            } else {
+                panic!("We've fallen victim to a hash collision.");
+            }
         } else {
             self.symtab
                 .names
                 .insert(record.hash_unchecked(), record.name_unchecked());
-            // Insert the record
+            self.records.push(record.clone());
         }
         todo!();
     }
@@ -154,6 +159,38 @@ pub struct InstrProfRecord {
     pub data: Option<Box<ValueProfDataRecord>>,
 }
 
+impl InstrProfRecord {
+    pub fn merge(&mut self, other: &Self) {
+        if self.counts.len() != other.counts.len() {
+            return;
+        }
+        for (own, other) in self.counts.iter_mut().zip(other.counts.iter()) {
+            let res = own.checked_add(*other);
+            *own = match res {
+                Some(s) => s,
+                None => u64::MAX, // TODO handle the warnings?
+            };
+        }
+        // TODO merge the data
+        if let Some((own, other)) = self.data.as_mut().zip(other.data.as_ref()) {
+            if own.indirect_callsites.len() == other.indirect_callsites.len() {
+                for (own, other) in own
+                    .indirect_callsites
+                    .iter_mut()
+                    .zip(other.indirect_callsites.iter())
+                {
+                    merge_site_records(own, other);
+                }
+            }
+            if own.mem_op_sizes.len() == other.mem_op_sizes.len() {
+                for (own, other) in own.mem_op_sizes.iter_mut().zip(other.mem_op_sizes.iter()) {
+                    merge_site_records(own, other);
+                }
+            }
+        }
+    }
+}
+
 #[derive(Clone, Debug, Default, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub struct ValueProfDataRecord {
     pub indirect_callsites: Vec<InstrProfValueSiteRecord>,
@@ -161,6 +198,14 @@ pub struct ValueProfDataRecord {
 }
 
 type InstrProfValueSiteRecord = Vec<InstrProfValueData>;
+
+fn merge_site_records(dst: &mut InstrProfValueSiteRecord, src: &InstrProfValueSiteRecord) {
+    if dst.len() == src.len() {
+        dst.sort_unstable();
+        let mut other_vals = src.iter().map(|x| x.value).collect::<Vec<u64>>();
+        other_vals.sort_unstable();
+    }
+}
 
 #[derive(Clone, Debug, Default, Eq, Hash)]
 pub struct InstrProfValueData {

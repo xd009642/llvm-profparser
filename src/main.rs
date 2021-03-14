@@ -340,6 +340,7 @@ impl MergeCommand {
         for profile in &profiles {
             base.merge(profile);
         }
+
         Ok(())
     }
 }
