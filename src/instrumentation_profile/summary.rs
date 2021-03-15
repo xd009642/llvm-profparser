@@ -28,7 +28,7 @@ impl ProfileSummary {
     }
 
     fn add_count(&mut self, count: u64) {
-        self.total_count.saturating_add(count);
+        self.total_count = self.total_count.saturating_add(count);
         if count > self.max_count {
             self.max_count = count;
         }

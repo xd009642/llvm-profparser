@@ -8,6 +8,7 @@ use std::io;
 use std::io::prelude::*;
 use std::path::Path;
 
+pub mod binary_writer;
 pub mod indexed_profile;
 pub mod raw_profile;
 pub mod stats;
@@ -57,4 +58,8 @@ pub trait InstrProfReader {
     /// Detects that the bytes match the current reader format if it can't read the format it will
     /// return false
     fn has_format(input: impl Read) -> bool;
+}
+
+pub trait InstrProfWriter {
+    fn write(&self, profile: &InstrumentationProfile, writer: &mut impl Write) -> io::Result<()>;
 }
