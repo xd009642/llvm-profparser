@@ -204,6 +204,31 @@ fn merge_site_records(dst: &mut InstrProfValueSiteRecord, src: &InstrProfValueSi
         dst.sort_unstable();
         let mut other_vals = src.iter().map(|x| x.value).collect::<Vec<u64>>();
         other_vals.sort_unstable();
+        let mut i = 0;
+        for j in src {
+            let current = dst
+                .iter_mut()
+                .enumerate()
+                .skip(i)
+                .skip_while(|x| x.1.value < j.value)
+                .nth(0);
+
+            match current {
+                Some((index, element)) if element.value == j.value => {
+                    element.count = element.count.checked_add(j.count).unwrap_or(u64::MAX);
+                    dst.insert(index + 1, j.clone());
+                    i = index + 1;
+                }
+                Some((index, _)) => {
+                    dst.insert(index, j.clone());
+                    i = index + 1;
+                }
+                None => {
+                    i = dst.len();
+                    dst.push(j.clone());
+                }
+            }
+        }
     }
 }
 
