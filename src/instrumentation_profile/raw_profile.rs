@@ -14,12 +14,6 @@ use std::convert::TryInto;
 use std::fmt::{Debug, Display};
 use std::mem::size_of;
 
-const VARIANT_MASKS_ALL: u64 = 0xff00_0000_0000_0000;
-/// This is taken from `llvm/include/llvm/ProfileData/InstrProfileData.inc`
-const VARIANT_MASK_IR_PROF: u64 = 1u64 << 56;
-/// This is taken from `llvm/include/llvm/ProfileData/InstrProfileData.inc`
-const VARIANT_MASK_CSIR_PROF: u64 = 1u64 << 57;
-
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub enum RawProfileError {
     Eof,

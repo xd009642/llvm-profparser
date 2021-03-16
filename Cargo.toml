@@ -14,6 +14,7 @@ leb128 = "0.2.4"
 nom = "6"
 md5 = "0.7"
 structopt = { version = "0.3.21", optional = true }
+num_enum = "0.5.1"
 
 [[bin]]
 name = "llvm_profparser"

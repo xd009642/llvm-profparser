@@ -3,6 +3,13 @@ use std::collections::BTreeMap;
 use std::convert::TryInto;
 use std::fmt;
 
+/// ~VARIANT_MASKS_ALL & Header.version is the version number
+pub(crate) const VARIANT_MASKS_ALL: u64 = 0xff00_0000_0000_0000;
+/// This is taken from `llvm/include/llvm/ProfileData/InstrProfileData.inc`
+pub(crate) const VARIANT_MASK_IR_PROF: u64 = 1u64 << 56;
+/// This is taken from `llvm/include/llvm/ProfileData/InstrProfileData.inc`
+pub(crate) const VARIANT_MASK_CSIR_PROF: u64 = 1u64 << 57;
+
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Ord, PartialOrd, Hash)]
 pub enum ValueKind {
     IndirectCallTarget = 0,
