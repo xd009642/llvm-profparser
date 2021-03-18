@@ -1,4 +1,5 @@
 pub mod instrumentation_profile;
+pub mod summary;
 pub mod util;
 
 pub use crate::instrumentation_profile::parse;

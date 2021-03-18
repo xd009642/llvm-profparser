@@ -1,4 +1,5 @@
 use crate::instrumentation_profile::*;
+use crate::summary::ProfileSummary;
 use nom::{number::complete::*, IResult};
 use num_enum::TryFromPrimitive;
 use std::convert::TryFrom;
@@ -42,12 +43,12 @@ impl ProfileSummaryEntry {
     const SIZE: usize = 24;
 }
 
-pub struct ProfileSummary {
+pub struct Summary {
     num_summary_fields: usize,
     num_summary_entries: usize,
 }
 
-impl ProfileSummary {
+impl Summary {
     const SIZE: usize = 16;
 
     pub fn size(&self) -> usize {
@@ -68,12 +69,12 @@ fn read_summary<'a>(input: &'a [u8], header: &Header) -> IResult<&'a [u8], Optio
         let (bytes, n_fields) = le_u64(input)?;
         let (bytes, n_entries) = le_u64(input)?;
 
-        let summary = ProfileSummary {
+        let summary = Summary {
             num_summary_fields: n_fields as usize,
             num_summary_entries: n_entries as usize,
         };
 
-        Ok((bytes, Some(summary)))
+        todo!()
     } else {
         Ok((input, None))
     }
