@@ -1,7 +1,8 @@
 use crate::instrumentation_profile::*;
-use crate::summary::ProfileSummary;
+use crate::summary::*;
 use nom::{number::complete::*, IResult};
 use num_enum::TryFromPrimitive;
+use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::io::Read;
 
@@ -21,7 +22,8 @@ pub struct Header {
     pub hash_offset: u64,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Ord, PartialOrd, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Ord, PartialOrd, Hash, TryFromPrimitive)]
+#[repr(u64)]
 pub enum SummaryFieldKind {
     TotalNumFunctions,
     TotalNumBlocks,
@@ -31,50 +33,84 @@ pub enum SummaryFieldKind {
     TotalBlockCount,
 }
 
-#[derive(Clone, Debug, Default, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub struct ProfileSummaryEntry {
-    pub cutoff: u64,
-    pub min_count: u64,
-    pub num_counts: u64,
-}
-
-impl ProfileSummaryEntry {
-    /// Size of the fields in bytes
-    const SIZE: usize = 24;
-}
-
-pub struct Summary {
-    num_summary_fields: usize,
-    num_summary_entries: usize,
-}
-
-impl Summary {
-    const SIZE: usize = 16;
-
-    pub fn size(&self) -> usize {
-        self.num_summary_entries * ProfileSummaryEntry::SIZE
-            + Self::SIZE
-            + (8 * self.num_summary_fields)
-    }
-}
-
 impl Header {
     pub fn version(&self) -> u64 {
         self.version & !VARIANT_MASKS_ALL
     }
+
+    pub fn is_csir_prof(&self) -> bool {
+        (self.version & VARIANT_MASK_CSIR_PROF) > 0
+    }
 }
 
-fn read_summary<'a>(input: &'a [u8], header: &Header) -> IResult<&'a [u8], Option<ProfileSummary>> {
+fn parse_summary<'a>(
+    mut input: &'a [u8],
+    header: &Header,
+    use_cs: bool,
+) -> IResult<&'a [u8], Option<ProfileSummary>> {
     if header.version() >= 4 {
         let (bytes, n_fields) = le_u64(input)?;
-        let (bytes, n_entries) = le_u64(input)?;
-
-        let summary = Summary {
-            num_summary_fields: n_fields as usize,
-            num_summary_entries: n_entries as usize,
+        let (bytes, n_entries) = le_u64(bytes)?;
+        input = bytes;
+        let mut fields = HashMap::new();
+        for i in 0..n_fields {
+            let (bytes, value) = le_u64(input)?;
+            input = bytes;
+            if let Ok(field) = SummaryFieldKind::try_from_primitive(i) {
+                fields.insert(field, value);
+            }
+        }
+        let mut detailed_summary = vec![];
+        for _ in 0..n_entries {
+            // Start getting the cutoffs
+            let (bytes, cutoff) = le_u64(input)?;
+            let (bytes, min_count) = le_u64(bytes)?;
+            let (bytes, num_counts) = le_u64(bytes)?;
+            input = bytes;
+            detailed_summary.push(ProfileSummaryEntry {
+                cutoff,
+                min_count,
+                num_counts,
+            });
+        }
+        let kind = if use_cs { Kind::CsInstr } else { Kind::Instr };
+        let total_count = fields
+            .get(&SummaryFieldKind::TotalBlockCount)
+            .copied()
+            .unwrap_or_default();
+        let max_count = fields
+            .get(&SummaryFieldKind::MaxBlockCount)
+            .copied()
+            .unwrap_or_default();
+        let max_internal_count = fields
+            .get(&SummaryFieldKind::MaxInternalBlockCount)
+            .copied()
+            .unwrap_or_default();
+        let max_function_count = fields
+            .get(&SummaryFieldKind::MaxFunctionCount)
+            .copied()
+            .unwrap_or_default();
+        let num_counts = fields
+            .get(&SummaryFieldKind::TotalNumBlocks)
+            .map(|x| *x as u32)
+            .unwrap_or_default();
+        let num_fns = fields
+            .get(&SummaryFieldKind::TotalNumFunctions)
+            .map(|x| *x as u32)
+            .unwrap_or_default();
+        let summary = ProfileSummary {
+            kind,
+            total_count,
+            max_count,
+            max_internal_count,
+            max_function_count,
+            num_counts,
+            num_fns,
+            partial: false,
+            partial_profile_ratio: 0.0,
+            detailed_summary,
         };
-
-        todo!()
+        Ok((input, Some(summary)))
     } else {
         Ok((input, None))
     }
@@ -86,6 +122,14 @@ impl InstrProfReader for IndexedInstrProf {
     fn parse_bytes(input: &[u8]) -> IResult<&[u8], InstrumentationProfile> {
         let (bytes, header) = Self::parse_header(input)?;
         println!("Indexed header: {:?}", header);
+        let (bytes, summary) = parse_summary(bytes, &header, false)?;
+        println!("Summary: {:?}", summary);
+        let (bytes, cs_summary) = if header.is_csir_prof() {
+            parse_summary(bytes, &header, true)?
+        } else {
+            (bytes, None)
+        };
+        println!("CSIR Summary: {:?}", cs_summary);
         todo!()
     }
 
