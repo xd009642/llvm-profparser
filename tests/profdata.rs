@@ -111,6 +111,7 @@ fn show_proftexts() {
 }
 
 #[test]
+#[ignore]
 fn merge() {
     let data = get_data_dir();
     let files = [
