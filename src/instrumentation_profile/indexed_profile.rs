@@ -1,3 +1,4 @@
+use crate::hash_table::*;
 use crate::instrumentation_profile::*;
 use crate::summary::*;
 use nom::{number::complete::*, IResult};
@@ -130,6 +131,12 @@ impl InstrProfReader for IndexedInstrProf {
             (bytes, None)
         };
         println!("CSIR Summary: {:?}", cs_summary);
+        let table_start = input.len() - bytes.len();
+        let (bytes, table) = HashTable::parse(
+            bytes,
+            table_start,
+            header.hash_offset as usize - table_start,
+        )?;
         todo!()
     }
 

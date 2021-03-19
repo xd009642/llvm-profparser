@@ -84,7 +84,7 @@ fn read_value_profile_data(mut input: &[u8]) -> IResult<&[u8], Option<Box<ValueP
             todo!()
         }
         input = bytes;
-        for i in 0..n_kinds {
+        for _i in 0..n_kinds {
             let (bytes, _) = skip_to_content(input)?;
             let (bytes, kind) = read_digit(bytes)?;
             let (bytes, _) = skip_to_content(bytes)?;
@@ -103,12 +103,12 @@ fn read_value_profile_data(mut input: &[u8]) -> IResult<&[u8], Option<Box<ValueP
             };
             // let mut sites = vec![];
             input = bytes;
-            for j in 0..n_sites {
+            for _j in 0..n_sites {
                 let (bytes, _) = skip_to_content(input)?;
                 let (bytes, n_val_data) = read_digit(bytes)?;
                 input = bytes;
                 let mut site_records = vec![];
-                for k in 0..n_val_data {
+                for _k in 0..n_val_data {
                     let (bytes, _) = skip_to_content(input)?;
                     input = match kind {
                         ValueKind::IndirectCallTarget => {

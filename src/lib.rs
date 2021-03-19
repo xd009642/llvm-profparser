@@ -1,3 +1,4 @@
+mod hash_table;
 pub mod instrumentation_profile;
 pub mod summary;
 pub mod util;
