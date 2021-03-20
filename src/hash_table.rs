@@ -1,6 +1,24 @@
 use nom::{number::complete::*, IResult};
+use std::borrow::Cow;
+
+struct KeyDataLen {
+    key_len: u64,
+    data_len: u64,
+}
 
 pub(crate) struct HashTable {}
+
+fn read_key_data_len(input: &[u8]) -> IResult<&[u8], KeyDataLen> {
+    let (bytes, key_len) = le_u64(input)?;
+    let (bytes, data_len) = le_u64(bytes)?;
+    let res = KeyDataLen { key_len, data_len };
+    Ok((bytes, res))
+}
+
+fn read_key(input: &[u8], key_len: usize) -> IResult<&[u8], Cow<'_, str>> {
+    let res = String::from_utf8_lossy(&input[..key_len]);
+    Ok((&input[key_len..], res))
+}
 
 impl HashTable {
     /// buckets is the data the hash table buckets start at - the start of the `HashTable` in memory.
