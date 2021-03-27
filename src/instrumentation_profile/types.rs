@@ -163,7 +163,7 @@ impl NamedInstrProfRecord {
 #[derive(Clone, Debug, Default, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub struct InstrProfRecord {
     pub counts: Vec<u64>,
-    pub data: Option<Box<ValueProfDataRecord>>,
+    pub data: Option<Box<ValueProfDataRecord>>, // TODO Should be ValueProfRecord?
 }
 
 impl InstrProfRecord {
@@ -247,8 +247,17 @@ pub struct InstrProfValueData {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ValueProfData {
-    total_size: u32,
-    num_value_kinds: u32,
+    pub(crate) total_size: u32,
+    pub(crate) num_value_kinds: u32,
+}
+
+impl ValueProfData {
+    fn deserialize_to(&self, record: &mut InstrProfRecord, symtab: Option<&Symtab>) {
+        if self.num_value_kinds == 0 {
+            return;
+        }
+        todo!()
+    }
 }
 
 impl PartialOrd for InstrProfValueData {

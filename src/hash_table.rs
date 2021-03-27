@@ -9,12 +9,6 @@ struct KeyDataLen {
     data_len: u64,
 }
 
-impl KeyDataLen {
-    fn len(&self) -> usize {
-        (self.key_len + self.data_len) as usize
-    }
-}
-
 pub(crate) struct HashTable(pub HashMap<String, Vec<InstrProfRecord>>);
 
 fn read_key_data_len(input: &[u8]) -> IResult<&[u8], KeyDataLen> {
@@ -29,8 +23,46 @@ fn read_key(input: &[u8], key_len: usize) -> IResult<&[u8], Cow<'_, str>> {
     Ok((&input[key_len..], res))
 }
 
-fn read_value(input: &[u8], data_len: usize) -> IResult<&[u8], Vec<InstrProfRecord>> {
-    todo!();
+fn read_value(mut input: &[u8], data_len: usize) -> IResult<&[u8], Vec<InstrProfRecord>> {
+    if data_len % 8 != 0 {
+        // Element is corrupted, it should be aligned
+    }
+    let mut result = vec![];
+    let end_len = input.len() - data_len;
+
+    while input.len() > end_len {
+        let mut counts = vec![];
+        let (bytes, hash) = le_u64(input)?;
+        // This is only available for versions > v1. But as rust won't be going backwards to legacy
+        // versions it's a safe assumption.
+        let (bytes, counts_len) = le_u64(bytes)?;
+        input = bytes;
+        for _ in 0..counts_len {
+            let (bytes, count) = le_u64(input)?;
+            input = bytes;
+            counts.push(count);
+        }
+
+        // If the version is > v2 then there can also be value profiling data so lets try and parse
+        // that now
+        let (bytes, len) = le_u32(input)?;
+        let value_prof_data;
+        if len == 8 {
+            let (bytes, total_size) = le_u32(bytes)?;
+            let (bytes, num_value_kinds) = le_u32(bytes)?;
+            input = bytes;
+            value_prof_data = Some(ValueProfData {
+                total_size,
+                num_value_kinds,
+            });
+        } else {
+            value_prof_data = None;
+            input = bytes;
+        }
+
+        result.push(InstrProfRecord { counts, data: None });
+    }
+    Ok((input, result))
 }
 
 impl HashTable {
