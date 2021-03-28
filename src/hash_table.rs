@@ -9,7 +9,8 @@ struct KeyDataLen {
     data_len: u64,
 }
 
-pub(crate) struct HashTable(pub HashMap<String, Vec<InstrProfRecord>>);
+#[derive(Clone, Debug)]
+pub(crate) struct HashTable(pub HashMap<(u64, String), InstrProfRecord>);
 
 fn read_key_data_len(input: &[u8]) -> IResult<&[u8], KeyDataLen> {
     let (bytes, key_len) = le_u64(input)?;
@@ -23,7 +24,7 @@ fn read_key(input: &[u8], key_len: usize) -> IResult<&[u8], Cow<'_, str>> {
     Ok((&input[key_len..], res))
 }
 
-fn read_value(mut input: &[u8], data_len: usize) -> IResult<&[u8], Vec<InstrProfRecord>> {
+fn read_value(mut input: &[u8], data_len: usize) -> IResult<&[u8], (u64, InstrProfRecord)> {
     if data_len % 8 != 0 {
         // Element is corrupted, it should be aligned
     }
@@ -45,24 +46,22 @@ fn read_value(mut input: &[u8], data_len: usize) -> IResult<&[u8], Vec<InstrProf
 
         // If the version is > v2 then there can also be value profiling data so lets try and parse
         // that now
-        let (bytes, len) = le_u32(input)?;
-        let value_prof_data;
-        if len == 8 {
-            let (bytes, total_size) = le_u32(bytes)?;
-            let (bytes, num_value_kinds) = le_u32(bytes)?;
-            input = bytes;
-            value_prof_data = Some(ValueProfData {
-                total_size,
-                num_value_kinds,
-            });
+        let (bytes, total_size) = le_u32(input)?;
+        let (bytes, num_value_kinds) = le_u32(bytes)?;
+        input = bytes;
+        let value_prof_data = ValueProfData {
+            total_size,
+            num_value_kinds,
+        };
+        let data = if value_prof_data.num_value_kinds > 0 {
+            todo!()
         } else {
-            value_prof_data = None;
-            input = bytes;
-        }
-
-        result.push(InstrProfRecord { counts, data: None });
+            None
+        };
+        result.push((hash, InstrProfRecord { counts, data }));
     }
-    Ok((input, result))
+    assert_eq!(result.len(), 1);
+    Ok((input, result.remove(0)))
 }
 
 impl HashTable {
@@ -84,7 +83,6 @@ impl HashTable {
             payload = bytes;
             num_entries = entries;
         }
-
         Ok((payload, result))
     }
 
@@ -96,11 +94,11 @@ impl HashTable {
         let (bytes, num_items_in_bucket) = le_u16(input)?;
         let mut remaining = bytes;
         for i in 0..num_items_in_bucket {
-            let (bytes, hash) = le_u64(remaining)?;
+            let (bytes, _hash) = le_u64(remaining)?;
             let (bytes, lens) = read_key_data_len(bytes)?;
             let (bytes, key) = read_key(bytes, lens.key_len as usize)?;
-            let (bytes, value) = read_value(bytes, lens.data_len as usize)?;
-            self.0.insert(key.to_string(), value);
+            let (bytes, (hash, value)) = read_value(bytes, lens.data_len as usize)?;
+            self.0.insert((hash, key.to_string()), value);
             remaining = bytes;
             assert!(num_entries > 0);
             num_entries -= 1;

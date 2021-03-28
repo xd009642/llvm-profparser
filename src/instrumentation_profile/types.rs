@@ -163,7 +163,7 @@ impl NamedInstrProfRecord {
 #[derive(Clone, Debug, Default, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub struct InstrProfRecord {
     pub counts: Vec<u64>,
-    pub data: Option<Box<ValueProfDataRecord>>, // TODO Should be ValueProfRecord?
+    pub data: Option<Box<ValueProfDataRecord>>,
 }
 
 impl InstrProfRecord {
@@ -251,11 +251,21 @@ pub struct ValueProfData {
     pub(crate) num_value_kinds: u32,
 }
 
+/// TODO This is currently unused but unsure on if it's used in llvm coverage. Every file I've
+/// tried has had the number of these set to zero.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ValueProfRecord {
+    kind: u32,
+    num_value_sites: u32,
+    site_count: u8,
+}
+
 impl ValueProfData {
     fn deserialize_to(&self, record: &mut InstrProfRecord, symtab: Option<&Symtab>) {
         if self.num_value_kinds == 0 {
             return;
         }
+
         todo!()
     }
 }

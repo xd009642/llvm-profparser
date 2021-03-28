@@ -42,6 +42,10 @@ impl Header {
     pub fn is_csir_prof(&self) -> bool {
         (self.version & VARIANT_MASK_CSIR_PROF) > 0
     }
+
+    pub fn is_ir_prof(&self) -> bool {
+        (self.version & VARIANT_MASK_IR_PROF) > 0
+    }
 }
 
 fn parse_summary<'a>(
@@ -120,24 +124,37 @@ fn parse_summary<'a>(
 impl InstrProfReader for IndexedInstrProf {
     type Header = Header;
 
-    fn parse_bytes(input: &[u8]) -> IResult<&[u8], InstrumentationProfile> {
+    fn parse_bytes(mut input: &[u8]) -> IResult<&[u8], InstrumentationProfile> {
         let (bytes, header) = Self::parse_header(input)?;
-        println!("Indexed header: {:?}", header);
         let (bytes, summary) = parse_summary(bytes, &header, false)?;
-        println!("Summary: {:?}", summary);
         let (bytes, cs_summary) = if header.is_csir_prof() {
             parse_summary(bytes, &header, true)?
         } else {
             (bytes, None)
         };
-        println!("CSIR Summary: {:?}", cs_summary);
+        let mut profile = InstrumentationProfile::default();
+        profile.version = Some(header.version);
+        profile.has_csir = header.is_csir_prof();
+        profile.is_ir = header.is_ir_prof();
+
         let table_start = input.len() - bytes.len();
         let (bytes, table) = HashTable::parse(
             bytes,
             table_start,
             header.hash_offset as usize - table_start,
         )?;
-        todo!()
+        input = bytes;
+        for ((hash, name), v) in &table.0 {
+            let name = name.to_string();
+            profile.symtab.names.insert(*hash, name.clone());
+            let record = NamedInstrProfRecord {
+                name: Some(name),
+                hash: Some(*hash),
+                record: v.clone(),
+            };
+            profile.records.push(record);
+        }
+        Ok((input, profile))
     }
 
     fn parse_header(input: &[u8]) -> IResult<&[u8], Self::Header> {
