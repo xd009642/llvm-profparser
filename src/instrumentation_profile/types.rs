@@ -112,7 +112,6 @@ impl InstrumentationProfile {
                 .insert(record.hash_unchecked(), record.name_unchecked());
             self.records.push(record.clone());
         }
-        todo!();
     }
 }
 

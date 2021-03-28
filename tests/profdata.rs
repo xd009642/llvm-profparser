@@ -54,6 +54,7 @@ fn merge_command(files: &[PathBuf], id: &str) -> Option<MergedFiles> {
         let _ = std::fs::remove_file(llvm_output);
         let _ = std::fs::remove_file(rust_output);
         // If llvm succeeds I should succeed!
+        println!("{}", String::from_utf8_lossy(&rust.stderr));
         assert!(!llvm.status.success());
         println!("{}", String::from_utf8_lossy(&llvm.stderr));
         None
@@ -111,7 +112,12 @@ fn show_proftexts() {
 }
 
 #[test]
-#[ignore]
+fn show_profdatas() {
+    let ext = OsStr::new("profdata");
+    check_command(&ext);
+}
+
+#[test]
 fn merge() {
     let data = get_data_dir();
     let files = [

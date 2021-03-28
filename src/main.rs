@@ -340,7 +340,7 @@ impl MergeCommand {
         for profile in &profiles {
             base.merge(profile);
         }
-
+        // Now to write it out?
         Ok(())
     }
 }
