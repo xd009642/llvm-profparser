@@ -1,10 +1,10 @@
+use llvm_profparser::{parse, parse_bytes};
 use pretty_assertions::assert_eq;
 use std::collections::HashSet;
 use std::ffi::OsStr;
 use std::fs::read_dir;
 use std::path::PathBuf;
 use std::process::Command;
-use llvm_profparser::{parse, parse_bytes};
 
 #[derive(Clone, Debug)]
 struct MergedFiles {
@@ -118,7 +118,10 @@ fn check_against_text(ext: &OsStr) {
 
         if llvm.status.success() {
             count += 1;
-            println!("Parsing file: {}", data.join(raw_file.file_name()).display());
+            println!(
+                "Parsing file: {}",
+                data.join(raw_file.file_name()).display()
+            );
             println!("{}", String::from_utf8_lossy(&llvm.stdout));
             let text_prof = parse_bytes(&llvm.stdout).unwrap();
             let parsed_prof = parse(data.join(raw_file.file_name())).unwrap();
@@ -126,8 +129,14 @@ fn check_against_text(ext: &OsStr) {
             // Okay so we don't care about versioning. We don't care about symtab as there might be
             // hash collisions. And we don't care about the record ordering.
 
-            assert_eq!(text_prof.is_ir_level_profile(), parsed_prof.is_ir_level_profile());
-            assert_eq!(text_prof.has_csir_level_profile(), parsed_prof.has_csir_level_profile());
+            assert_eq!(
+                text_prof.is_ir_level_profile(),
+                parsed_prof.is_ir_level_profile()
+            );
+            assert_eq!(
+                text_prof.has_csir_level_profile(),
+                parsed_prof.has_csir_level_profile()
+            );
             let text_records = text_prof.records.iter().collect::<HashSet<_>>();
             let parse_records = parsed_prof.records.iter().collect::<HashSet<_>>();
             assert_eq!(text_records, parse_records);
