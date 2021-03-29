@@ -1,3 +1,6 @@
+use crate::instrumentation_profile::types::InstrumentationProfile;
+use std::path::Path;
+
 mod hash_table;
 pub mod instrumentation_profile;
 pub mod summary;
@@ -12,4 +15,20 @@ pub enum ProfileFormat {
     ExtBinary,
     Text,
     Gcc,
+}
+
+pub fn merge_profiles<T>(files: &[T]) -> std::io::Result<InstrumentationProfile>
+where
+    T: AsRef<Path>,
+{
+    let mut profiles = vec![];
+    for input in files {
+        let profile = parse(input)?;
+        profiles.push(profile);
+    }
+    let mut base = profiles.remove(0);
+    for profile in &profiles {
+        base.merge(profile);
+    }
+    Ok(base)
 }

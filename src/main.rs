@@ -1,7 +1,7 @@
 use llvm_profparser::instrumentation_profile::stats::*;
 use llvm_profparser::instrumentation_profile::summary::*;
 use llvm_profparser::instrumentation_profile::types::*;
-use llvm_profparser::parse;
+use llvm_profparser::*;
 use std::cmp::Ordering;
 use std::collections::BinaryHeap;
 use std::path::PathBuf;
@@ -331,15 +331,7 @@ impl MergeCommand {
             !self.input.is_empty(),
             "No input files selected. See merge --help"
         );
-        let mut profiles = vec![];
-        for input in &self.input {
-            let profile = parse(&input)?;
-            profiles.push(profile);
-        }
-        let mut base = profiles.remove(0);
-        for profile in &profiles {
-            base.merge(profile);
-        }
+        let profile = merge_profiles(&self.input)?;
         // Now to write it out?
         Ok(())
     }

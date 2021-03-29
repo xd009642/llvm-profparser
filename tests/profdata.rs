@@ -1,16 +1,10 @@
-use llvm_profparser::{parse, parse_bytes};
+use llvm_profparser::{merge_profiles, parse, parse_bytes};
 use pretty_assertions::assert_eq;
 use std::collections::HashSet;
 use std::ffi::OsStr;
 use std::fs::read_dir;
 use std::path::PathBuf;
 use std::process::Command;
-
-#[derive(Clone, Debug)]
-struct MergedFiles {
-    llvm_output: PathBuf,
-    rust_output: PathBuf,
-}
 
 fn get_data_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data")
@@ -23,9 +17,8 @@ fn get_printout(output: &[u8]) -> Vec<String> {
         .collect()
 }
 
-fn merge_command(files: &[PathBuf], id: &str) -> Option<MergedFiles> {
+fn check_merge_command(files: &[PathBuf], id: &str) {
     let llvm_output = PathBuf::from(format!("llvm_{}.profdata", id));
-    let rust_output = PathBuf::from(format!("rust_{}.profdata", id));
     let names = files
         .iter()
         .map(|x| x.display().to_string())
@@ -38,28 +31,26 @@ fn merge_command(files: &[PathBuf], id: &str) -> Option<MergedFiles> {
         .output()
         .unwrap();
 
-    let rust = assert_cmd::Command::cargo_bin("llvm_profparser")
-        .unwrap()
-        .args(&["merge", "-i"])
-        .args(&names)
-        .arg("-o")
-        .arg(&rust_output)
-        .output()
-        .unwrap();
+    if llvm.status.success() {
+        let llvm_merged = parse(&llvm_output).unwrap();
+        let rust_merged = merge_profiles(&names).unwrap();
 
-    if llvm.status.success() && rust.status.success() {
-        Some(MergedFiles {
-            llvm_output,
-            rust_output,
-        })
+        // Okay so we don't care about versioning. We don't care about symtab as there might be
+        // hash collisions. And we don't care about the record ordering.
+        assert_eq!(
+            llvm_merged.is_ir_level_profile(),
+            rust_merged.is_ir_level_profile()
+        );
+        assert_eq!(
+            llvm_merged.has_csir_level_profile(),
+            rust_merged.has_csir_level_profile()
+        );
+        let llvm_records = llvm_merged.records.iter().collect::<HashSet<_>>();
+        let rust_records = rust_merged.records.iter().collect::<HashSet<_>>();
+        assert!(!llvm_records.is_empty());
+        assert_eq!(llvm_records, rust_records);
     } else {
-        let _ = std::fs::remove_file(llvm_output);
-        let _ = std::fs::remove_file(rust_output);
-        // If llvm succeeds I should succeed!
-        println!("{}", String::from_utf8_lossy(&rust.stderr));
-        assert!(!llvm.status.success());
-        println!("{}", String::from_utf8_lossy(&llvm.stderr));
-        None
+        panic!("LLVM failed to merge: {:?}", files);
     }
 }
 
@@ -165,7 +156,6 @@ fn show_profdatas() {
 }
 
 #[test]
-#[ignore]
 fn merge() {
     let data = get_data_dir();
     let files = [
@@ -174,27 +164,5 @@ fn merge() {
         data.join("foo3-2.proftext"),
     ];
 
-    let output = merge_command(&files, "foo_results").expect("Pick better test files");
-    let llvm_merge = assert_cmd::Command::cargo_bin("llvm_profparser")
-        .unwrap()
-        .args(&["show", "--all-functions", "-i"])
-        .arg(&output.llvm_output)
-        .output()
-        .expect("Failed to run llvm_profparser on file");
-
-    let rust_merge = assert_cmd::Command::cargo_bin("llvm_profparser")
-        .unwrap()
-        .args(&["show", "--all-functions", "-i"])
-        .arg(&output.rust_output)
-        .output()
-        .expect("Failed to run llvm_profparser on file");
-
-    assert_eq!(
-        get_printout(&llvm_merge.stdout),
-        get_printout(&rust_merge.stdout)
-    );
-    assert_eq!(
-        get_printout(&llvm_merge.stderr),
-        get_printout(&rust_merge.stderr)
-    );
+    check_merge_command(&files, "foo_results");
 }
