@@ -8,6 +8,8 @@ use std::io::Read;
 const IR_TAG: &[u8] = b"ir";
 const FE_TAG: &[u8] = b"fe";
 const CSIR_TAG: &[u8] = b"csir";
+const ENTRY_TAG: &[u8] = b"entry_first";
+const NOT_ENTRY_TAG: &[u8] = b"not_entry_first";
 const EXTERNAL_SYMBOL: &[u8] = b"** External Symbol **";
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
@@ -17,6 +19,7 @@ pub struct TextInstrProf;
 pub struct Header {
     is_ir_level: bool,
     has_csir: bool,
+    entry_first: bool,
 }
 
 fn check_tag(data: &[u8], tag: &[u8]) -> bool {
@@ -54,7 +57,8 @@ named!(
     parse_header<&[u8], Option<&[u8]>>,
     opt!(delimited!(
         tag!(b":"),
-        alt!(tag_no_case!(IR_TAG) | tag_no_case!(FE_TAG) | tag_no_case!(CSIR_TAG)| take_until!("\n")),
+        alt!(tag_no_case!(IR_TAG) | tag_no_case!(FE_TAG) | tag_no_case!(CSIR_TAG)| tag_no_case!(ENTRY_TAG) |
+             tag_no_case!(NOT_ENTRY_TAG) | take_until!("\n")),
         tag!(b"\n")
     ))
 );
@@ -150,6 +154,7 @@ impl InstrProfReader for TextInstrProf {
         let mut result = InstrumentationProfile {
             has_csir: header.has_csir,
             is_ir: header.is_ir_level,
+            is_entry_first: header.entry_first,
             ..Default::default()
         };
         while !input.is_empty() {
@@ -206,25 +211,29 @@ impl InstrProfReader for TextInstrProf {
     fn parse_header(input: &[u8]) -> IResult<&[u8], Self::Header> {
         let (input, _) = skip_to_content(input)?;
         let (bytes, name) = parse_header(input)?;
-        let (is_ir_level, has_csir) = match name {
+        // TODO does this work on multiline headers?
+        let (is_ir_level, has_csir, entry_first) = match name {
             Some(name) => {
-                if check_tag(name, IR_TAG) {
-                    (true, false)
+                if check_tag(name, IR_TAG) | check_tag(name, NOT_ENTRY_TAG) {
+                    (true, false, false)
                 } else if check_tag(name, FE_TAG) {
-                    (false, false)
+                    (false, false, false)
                 } else if check_tag(name, CSIR_TAG) {
-                    (true, true)
+                    (true, true, false)
+                } else if check_tag(name, ENTRY_TAG) {
+                    (false, false, true)
                 } else {
                     return Err(Err::Failure(Error::new(bytes, ErrorKind::Tag)));
                 }
             }
-            None => (false, false),
+            None => (false, false, false),
         };
         Ok((
             bytes,
             Header {
                 is_ir_level,
                 has_csir,
+                entry_first,
             },
         ))
     }

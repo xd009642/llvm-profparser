@@ -67,6 +67,7 @@ pub struct InstrumentationProfile {
     pub(crate) version: Option<u64>,
     pub(crate) has_csir: bool,
     pub(crate) is_ir: bool,
+    pub(crate) is_entry_first: bool,
     pub records: Vec<NamedInstrProfRecord>,
     pub symtab: Symtab,
 }
@@ -82,6 +83,10 @@ impl InstrumentationProfile {
 
     pub fn has_csir_level_profile(&self) -> bool {
         self.has_csir
+    }
+
+    pub fn is_entry_first(&self) -> bool {
+        self.is_entry_first
     }
 
     pub fn get_level(&self) -> InstrumentationLevel {
