@@ -38,7 +38,8 @@ fn str_to_digit(bytes: &[u8]) -> u64 {
 
 fn valid_name_char(character: u8) -> bool {
     let c = character as char;
-    c.is_ascii() && !c.is_ascii_whitespace()
+    // Whitespace is allowed!
+    c.is_ascii() && c != '\n' && c != '\r'
 }
 
 named!(strip_whitespace<&[u8], ()>, map!(one_of!(&b" \n\r\t"[..]), |_|()));

@@ -1,8 +1,10 @@
 use pretty_assertions::assert_eq;
+use std::collections::HashSet;
 use std::ffi::OsStr;
 use std::fs::read_dir;
 use std::path::PathBuf;
 use std::process::Command;
+use llvm_profparser::{parse, parse_bytes};
 
 #[derive(Clone, Debug)]
 struct MergedFiles {
@@ -99,6 +101,41 @@ fn check_command(ext: &OsStr) {
     assert!(count > 0);
 }
 
+fn check_against_text(ext: &OsStr) {
+    let data = get_data_dir();
+    let mut count = 0;
+    for raw_file in read_dir(&data)
+        .unwrap()
+        .filter_map(|x| x.ok())
+        .filter(|x| x.path().extension().unwrap_or_default() == ext)
+    {
+        let llvm = Command::new("cargo")
+            .current_dir(&data)
+            .args(&["profdata", "--", "show", "--text", "--all-functions"])
+            .arg(raw_file.file_name())
+            .output()
+            .expect("cargo binutils or llvm-profdata is not installed");
+
+        if llvm.status.success() {
+            count += 1;
+            println!("Parsing file: {}", data.join(raw_file.file_name()).display());
+            println!("{}", String::from_utf8_lossy(&llvm.stdout));
+            let text_prof = parse_bytes(&llvm.stdout).unwrap();
+            let parsed_prof = parse(data.join(raw_file.file_name())).unwrap();
+
+            // Okay so we don't care about versioning. We don't care about symtab as there might be
+            // hash collisions. And we don't care about the record ordering.
+
+            assert_eq!(text_prof.is_ir_level_profile(), parsed_prof.is_ir_level_profile());
+            assert_eq!(text_prof.has_csir_level_profile(), parsed_prof.has_csir_level_profile());
+            let text_records = text_prof.records.iter().collect::<HashSet<_>>();
+            let parse_records = parsed_prof.records.iter().collect::<HashSet<_>>();
+            assert_eq!(text_records, parse_records);
+        }
+    }
+    assert!(count > 0);
+}
+
 #[test]
 fn show_profraws() {
     let ext = OsStr::new("profraw");
@@ -114,10 +151,12 @@ fn show_proftexts() {
 #[test]
 fn show_profdatas() {
     let ext = OsStr::new("profdata");
-    check_command(&ext);
+    // Ordering of elements in printout make most of these tests troublesome
+    check_against_text(&ext);
 }
 
 #[test]
+#[ignore]
 fn merge() {
     let data = get_data_dir();
     let files = [

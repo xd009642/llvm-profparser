@@ -29,14 +29,18 @@ pub fn parse(filename: impl AsRef<Path>) -> io::Result<InstrumentationProfile> {
     let mut buffer = Vec::new();
     let mut f = File::open(filename)?;
     f.read_to_end(&mut buffer)?;
-    let nom_res = if IndexedInstrProf::has_format(buffer.as_slice()) {
-        IndexedInstrProf::parse_bytes(&buffer)
-    } else if RawInstrProf64::has_format(buffer.as_slice()) {
-        RawInstrProf64::parse_bytes(&buffer)
-    } else if RawInstrProf32::has_format(buffer.as_slice()) {
-        RawInstrProf32::parse_bytes(&buffer)
-    } else if TextInstrProf::has_format(buffer.as_slice()) {
-        TextInstrProf::parse_bytes(&buffer)
+    parse_bytes(buffer.as_slice())
+}
+
+pub fn parse_bytes(data: &[u8]) -> io::Result<InstrumentationProfile> {
+    let nom_res = if IndexedInstrProf::has_format(data) {
+        IndexedInstrProf::parse_bytes(data)
+    } else if RawInstrProf64::has_format(data) {
+        RawInstrProf64::parse_bytes(data)
+    } else if RawInstrProf32::has_format(data) {
+        RawInstrProf32::parse_bytes(data)
+    } else if TextInstrProf::has_format(data) {
+        TextInstrProf::parse_bytes(data)
     } else {
         return Err(io::Error::new(
             io::ErrorKind::Other,
