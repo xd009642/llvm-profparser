@@ -185,11 +185,15 @@ impl InstrProfReader for TextInstrProf {
                 counts: counters,
                 data,
             };
+            let name = std::str::from_utf8(name).map(|x| x.to_string()).ok();
             result.records.push(NamedInstrProfRecord {
-                name: std::str::from_utf8(name).map(|x| x.to_string()).ok(),
+                name: name.clone(),
                 hash: Some(hash),
                 record,
             });
+            if let Some(name) = name {
+                result.symtab.names.insert(hash, name);
+            }
             input = match skip_to_content(bytes) {
                 Ok((bytes, _)) => bytes,
                 Err(_) => &bytes[(bytes.len())..],
