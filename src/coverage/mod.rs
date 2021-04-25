@@ -1,8 +1,6 @@
 use nom::IResult;
 
-
 pub mod coverage_mapping;
-
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub enum CounterKind {
@@ -32,6 +30,14 @@ pub enum RegionKind {
     Gap,
 }
 
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub enum CounterType {
+    Zero,
+    ProfileInstrumentation,
+    SubtractionExpr,
+    AdditionExpr,
+}
+
 fn parse_counter_type(input: &[u8]) -> IResult<&[u8], CounterType> {
     let ty = (0x3 & input[0]) as u8;
     let ty = match ty {
@@ -45,7 +51,7 @@ fn parse_counter_type(input: &[u8]) -> IResult<&[u8], CounterType> {
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Ord, PartialOrd)]
-pub struct Counter  {
+pub struct Counter {
     pub kind: CounterKind,
     id: usize,
 }
@@ -54,7 +60,6 @@ impl Counter {
     const ENCODING_TAG_BITS: usize = 2;
     const ENCODING_TAG_MASK: usize = 3;
     const ENCODING_COUNTER_TAG_AND_EXP_REGION_TAG_BITS: usize = 4;
-
 }
 
 pub struct CounterMappingRegion {

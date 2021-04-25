@@ -1,3 +1,4 @@
+use llvm_profparser::*;
 use std::path::PathBuf;
 use structopt::StructOpt;
 
@@ -17,16 +18,26 @@ pub enum Command {
 
 #[derive(Clone, Debug, Eq, PartialEq, StructOpt)]
 pub struct ShowCommand {
-    /// File with the profile data obtained after an instrumented run
+    /// File with the profile data obtained after an instrumented run. This differs from llvm-cov
+    /// in that if multiple profiles are given it will do the equivalent of a llvm-profdata merge
+    /// on them.
     #[structopt(long = "instr-profile")]
-    instr_profile: PathBuf,
+    instr_profile: Vec<PathBuf>,
     /// Coverage executable or object file
     #[structopt(long = "object")]
-    object: Vec<PathBuf>,
+    objects: Vec<PathBuf>,
 }
 
 impl ShowCommand {
     fn run(&self) -> Result<(), Box<dyn std::error::Error>> {
+        let instr_prof = if self.instr_profile.len() == 1 {
+            parse(&self.instr_profile[0])?
+        } else if self.instr_profile.len() > 1 {
+            merge_profiles(&self.instr_profile)?
+        } else {
+            panic!("Must profide an instrumentation profile");
+        };
+        let mapping = CoverageMapping::new(&self.objects, &instr_prof);
         todo!();
     }
 }
