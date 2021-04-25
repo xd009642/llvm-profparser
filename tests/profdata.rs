@@ -76,13 +76,13 @@ fn check_command(ext: &OsStr) {
         if llvm.status.success() {
             println!("Checking {:?}", raw_file.file_name());
             count += 1;
-            let rust = assert_cmd::Command::cargo_bin("llvm_profparser")
+            let rust = assert_cmd::Command::cargo_bin("profparser")
                 .unwrap()
                 .current_dir(&data)
                 .args(&["show", "--all-functions", "-i"])
                 .arg(raw_file.file_name())
                 .output()
-                .expect("Failed to run llvm_profparser on file");
+                .expect("Failed to run profparser on file");
             println!("{}", String::from_utf8_lossy(&rust.stderr));
 
             assert_eq!(get_printout(&llvm.stdout), get_printout(&rust.stdout));
