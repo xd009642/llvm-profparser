@@ -19,3 +19,11 @@ num_enum = "0.5.1"
 [dev-dependencies]
 assert_cmd = "1"
 pretty_assertions = "0.7"
+
+[[bin]]
+name = "profparser"
+required-features = ["cli"]
+
+[[bin]]
+name = "cov"
+required-features = ["cli"]
