@@ -35,7 +35,7 @@ impl ShowCommand {
         } else if self.instr_profile.len() > 1 {
             merge_profiles(&self.instr_profile)?
         } else {
-            panic!("Must profide an instrumentation profile");
+            panic!("Must provide an instrumentation profile");
         };
         let mapping = CoverageMapping::new(&self.objects, &instr_prof);
         todo!();

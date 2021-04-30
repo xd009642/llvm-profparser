@@ -283,7 +283,7 @@ impl PartialOrd for InstrProfValueData {
 impl Ord for InstrProfValueData {
     fn cmp(&self, other: &Self) -> Ordering {
         // Do the reverse here
-        self.value.cmp(&self.value)
+        self.value.cmp(&other.value)
     }
 }
 
