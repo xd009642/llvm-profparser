@@ -11,9 +11,8 @@ jobs:
       matrix:
         version:
           - stable
-        # Need to bring these back in for llvm 12 update 
-        #  - beta
-        #  - nightly 
+          - beta
+          - nightly 
         target:
           - x86_64-unknown-linux-gnu
           - x86_64-unknown-linux-musl

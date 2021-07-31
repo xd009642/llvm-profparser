@@ -131,6 +131,8 @@ fn check_against_text(ext: &OsStr) {
             let text_records = text_prof.records.iter().collect::<HashSet<_>>();
             let parse_records = parsed_prof.records.iter().collect::<HashSet<_>>();
             assert_eq!(text_records, parse_records);
+        } else {
+            println!("{} failed", raw_file.path().display());
         }
     }
     assert!(count > 0);

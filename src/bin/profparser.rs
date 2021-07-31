@@ -275,7 +275,12 @@ impl ShowCommand {
                 }
             }
         }
-        println!("Instrumentation level: {}", profile.get_level());
+        if profile.get_level() == InstrumentationLevel::Ir {
+        println!("Instrumentation level: {}  entry_first = {}", profile.get_level(), profile.is_entry_first() as usize);
+        } else {
+            println!("Instrumentation level: {}", profile.get_level());
+
+        }
         if self.all_functions || self.function.is_some() {
             println!("Functions shown: {}", shown_funcs);
         }
