@@ -40,11 +40,10 @@ fn parse_coverage_mapping<'data, 'file>(endian: Endianness, section: &Section<'d
             filename_data_len, format_version
         );
 
-        let bytes = &data[16..(16 + filename_data_len as usize)];
+        //let bytes = &data[16..(16 + filename_data_len as usize)];
+        let bytes = &data[16..];
         let (bytes, file_count) = parse_leb128(bytes).unwrap();
         let (bytes, string) = parse_string_ref(bytes).unwrap();
-        //let (bytes, length_of_filenames) = parse_leb128(bytes).unwrap();
-        //let (mut bytes, compressed_length) = parse_leb128(bytes).unwrap();
 
         println!(
             "Filecount {} remaining: {}\n string: {}",
@@ -52,5 +51,6 @@ fn parse_coverage_mapping<'data, 'file>(endian: Endianness, section: &Section<'d
             bytes.len(),
             string.trim()
         );
+        println!("{:?}", bytes);
     }
 }
