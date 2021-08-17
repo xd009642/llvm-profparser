@@ -6,6 +6,10 @@ use std::error::Error;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+pub enum SectionReadError {
+    EmptyData,
+}
+
 pub struct CoverageMapping<'a> {
     profile: &'a InstrumentationProfile,
 }
@@ -26,7 +30,7 @@ impl<'a> CoverageMapping<'a> {
             let covfun = object_file
                 .section_by_name("__llvm_covfun")
                 .or(object_file.section_by_name(".lcovfun$M"))
-                .map(|x| parse_coverage_functions(object_file.endianess(), &x));
+                .map(|x| parse_coverage_functions(object_file.endianness(), &x));
         }
 
         todo!()
@@ -36,7 +40,7 @@ impl<'a> CoverageMapping<'a> {
 fn parse_coverage_mapping<'data, 'file>(
     endian: Endianness,
     section: &Section<'data, 'file>,
-) -> Vec<String> {
+) -> Result<Vec<String>, SectionReadError> {
     if let Ok(data) = section.data() {
         println!("Length: {}", data.len());
         // Read the number of affixed function records (now just 0 as not in this header)
@@ -72,7 +76,9 @@ fn parse_coverage_mapping<'data, 'file>(
         // What do I do with the rest of the bytes? Who knows?
         println!("leftovers?: {:?}", bytes);
 
-        file_strings
+        Ok(file_strings)
+    } else {
+        Err(SectionReadError::EmptyData)
     }
 }
 
