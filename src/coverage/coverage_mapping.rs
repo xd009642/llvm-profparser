@@ -27,10 +27,28 @@ impl<'a> CoverageMapping<'a> {
                 .or(object_file.section_by_name(".lcovmap$M"))
                 .map(|x| parse_coverage_mapping(object_file.endianness(), &x));
 
+            // names
+            let prof_names = object_file
+                .section_by_name("__llvm_prf_names")
+                .or(object_file.section_by_name(".lprfn$M"))
+                .map(|x| parse_profile_names(&x));
+
             let covfun = object_file
                 .section_by_name("__llvm_covfun")
                 .or(object_file.section_by_name(".lcovfun$M"))
                 .map(|x| parse_coverage_functions(object_file.endianness(), &x));
+
+            // counters
+            let prof_counts = object_file
+                .section_by_name("__llvm_prf_cnts")
+                .or(object_file.section_by_name(".lprfc$M"));
+
+            // Data
+            let prof_data = object_file
+                .section_by_name("__llvm_prf_data")
+                .or(object_file.section_by_name(".lprfd$M"));
+
+            // I don't think I need vnodes currently?
         }
 
         todo!()
@@ -84,4 +102,21 @@ fn parse_coverage_mapping<'data, 'file>(
 
 fn parse_coverage_functions<'data, 'file>(endian: Endianness, section: &Section<'data, 'file>) {
     todo!()
+}
+
+fn parse_profile_names<'data, 'file>(
+    section: &Section<'data, 'file>,
+) -> Result<Vec<String>, SectionReadError> {
+    if let Ok(data) = section.data() {
+        let mut bytes = &data[..];
+        let mut res = vec![];
+        while !bytes.is_empty() {
+            let (new_bytes, string) = parse_string_ref(bytes).unwrap();
+            bytes = new_bytes;
+            res.push(string);
+        }
+        Ok(res)
+    } else {
+        Err(SectionReadError::EmptyData)
+    }
 }
