@@ -41,7 +41,8 @@ impl<'a> CoverageMapping<'a> {
             // counters
             let prof_counts = object_file
                 .section_by_name("__llvm_prf_cnts")
-                .or(object_file.section_by_name(".lprfc$M"));
+                .or(object_file.section_by_name(".lprfc$M"))
+                .map(|x| parse_profile_counters(object_file.endianness(), &x));
 
             // Data
             let prof_data = object_file
@@ -102,6 +103,28 @@ fn parse_coverage_mapping<'data, 'file>(
 
 fn parse_coverage_functions<'data, 'file>(endian: Endianness, section: &Section<'data, 'file>) {
     todo!()
+}
+
+fn parse_profile_data<'data, 'file>(endian: Endianness, section: &Section<'data, 'file>) {
+    todo!()
+}
+
+fn parse_profile_counters<'data, 'file>(
+    endian: Endianness,
+    section: &Section<'data, 'file>,
+) -> Result<Vec<u64>, SectionReadError> {
+    if let Ok(data) = section.data() {
+        let mut result = vec![];
+        for i in (0..data.len()).step_by(8) {
+            if data.len() < (i + 8) {
+                break;
+            }
+            result.push(endian.read_u64_bytes(data[i..(i + 8)].try_into().unwrap()));
+        }
+        Ok(result)
+    } else {
+        Err(SectionReadError::EmptyData)
+    }
 }
 
 fn parse_profile_names<'data, 'file>(
