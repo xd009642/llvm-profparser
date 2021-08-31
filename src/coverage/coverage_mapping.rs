@@ -1,10 +1,11 @@
+use crate::coverage::*;
 use crate::instrumentation_profile::types::*;
 use crate::util::*;
 use object::{Endian, Endianness, Object, ObjectSection, Section};
 use std::convert::TryInto;
 use std::error::Error;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 pub enum SectionReadError {
     EmptyData,
@@ -47,7 +48,8 @@ impl<'a> CoverageMapping<'a> {
             // Data
             let prof_data = object_file
                 .section_by_name("__llvm_prf_data")
-                .or(object_file.section_by_name(".lprfd$M"));
+                .or(object_file.section_by_name(".lprfd$M"))
+                .map(|x| parse_profile_data(object_file.endianness(), &x));
 
             // I don't think I need vnodes currently?
         }
@@ -101,8 +103,63 @@ fn parse_coverage_mapping<'data, 'file>(
     }
 }
 
-fn parse_coverage_functions<'data, 'file>(endian: Endianness, section: &Section<'data, 'file>) {
-    todo!()
+fn parse_coverage_functions<'data, 'file>(
+    endian: Endianness,
+    section: &Section<'data, 'file>,
+) -> Result<Vec<FunctionRecordV3>, SectionReadError> {
+    if let Ok(data) = section.data() {
+        let mut bytes = data;
+        let mut res = vec![];
+        let section_len = bytes.len();
+        while !bytes.is_empty() {
+            let name_hash = endian.read_i64_bytes(bytes[0..8].try_into().unwrap());
+            let data_len = endian.read_u32_bytes(bytes[8..12].try_into().unwrap());
+            let func_hash = endian.read_i64_bytes(bytes[12..20].try_into().unwrap());
+            let filenames_ref = endian.read_u64_bytes(bytes[20..28].try_into().unwrap());
+            let header = FunctionRecordHeader {
+                name_hash,
+                data_len,
+                func_hash,
+                filenames_ref,
+            };
+            bytes = &bytes[28..];
+            let start_len = bytes.len();
+
+            let (data, id_len) = parse_leb128(bytes).unwrap();
+            bytes = data;
+            let mut filename_indices = vec![];
+            for _ in 0..id_len {
+                let (data, id) = parse_leb128(bytes).unwrap();
+                filename_indices.push(id);
+                bytes = data;
+            }
+            let (data, expr_len) = parse_leb128(bytes).unwrap();
+            bytes = data;
+            let mut exprs = vec![];
+            for _ in 0..expr_len {
+                let (data, lhs) = parse_leb128(bytes).unwrap();
+                let (data, rhs) = parse_leb128(data).unwrap();
+                let lhs = parse_counter(lhs);
+                let rhs = parse_counter(rhs);
+                exprs.push(Expression { lhs, rhs });
+                bytes = data;
+            }
+            let function_len = start_len - bytes.len(); // this should match header
+
+            let padding = if function_len < section_len && (function_len & 0x07) != 0 {
+                8 - (function_len & 0x07)
+            } else {
+                0
+            };
+            bytes = &bytes[padding..];
+
+            // Now apply padding, and if hash is 0 move on as it's a dummy otherwise add to result
+            // And decide what end type will be
+        }
+        Ok(res)
+    } else {
+        Err(SectionReadError::EmptyData)
+    }
 }
 
 fn parse_profile_data<'data, 'file>(endian: Endianness, section: &Section<'data, 'file>) {

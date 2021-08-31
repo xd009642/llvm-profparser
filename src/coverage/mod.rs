@@ -30,7 +30,7 @@ pub enum RegionKind {
     Gap,
 }
 
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum CounterType {
     Zero,
     ProfileInstrumentation,
@@ -38,22 +38,28 @@ pub enum CounterType {
     AdditionExpr,
 }
 
-fn parse_counter_type(input: &[u8]) -> IResult<&[u8], CounterType> {
-    let ty = (0x3 & input[0]) as u8;
-    let ty = match ty {
+pub(crate) fn parse_counter(input: u64) -> Counter {
+    let ty = (0x3 & input) as u8;
+    let kind = match ty {
         0 => CounterType::Zero,
         1 => CounterType::ProfileInstrumentation,
         2 => CounterType::SubtractionExpr,
         3 => CounterType::AdditionExpr,
         _ => unreachable!(),
     };
-    Ok((&input[1..], ty))
+    let id = (input >> 2); // For zero we don't actually care about this but we'll still do it
+    Counter { kind, id }
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub struct Counter {
-    pub kind: CounterKind,
-    id: usize,
+    pub kind: CounterType,
+    id: u64,
+}
+
+pub struct Expression {
+    lhs: Counter,
+    rhs: Counter,
 }
 
 impl Counter {
@@ -83,4 +89,17 @@ pub struct CoverageSegment {
     has_count: bool,
     is_region_entry: usize,
     is_gap_region: usize,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct FunctionRecordHeader {
+    name_hash: i64,
+    data_len: u32,
+    func_hash: i64,
+    filenames_ref: u64,
+}
+
+#[derive(Debug, Clone)]
+pub struct FunctionRecordV3 {
+    header: FunctionRecordHeader,
 }
