@@ -7,6 +7,7 @@ use std::error::Error;
 use std::fs;
 use std::path::PathBuf;
 
+#[derive(Copy, Clone, Debug)]
 pub enum SectionReadError {
     EmptyData,
 }
@@ -34,11 +35,6 @@ impl<'a> CoverageMapping<'a> {
                 .or(object_file.section_by_name(".lprfn$M"))
                 .map(|x| parse_profile_names(&x));
 
-            let covfun = object_file
-                .section_by_name("__llvm_covfun")
-                .or(object_file.section_by_name(".lcovfun$M"))
-                .map(|x| parse_coverage_functions(object_file.endianness(), &x));
-
             // counters
             let prof_counts = object_file
                 .section_by_name("__llvm_prf_cnts")
@@ -52,6 +48,16 @@ impl<'a> CoverageMapping<'a> {
                 .map(|x| parse_profile_data(object_file.endianness(), &x));
 
             // I don't think I need vnodes currently?
+            println!("{:?}", covmap);
+            println!("{:?}", prof_names);
+            println!("{:?}", prof_counts);
+            println!("{:?}", prof_data);
+
+            let covfun = object_file
+                .section_by_name("__llvm_covfun")
+                .or(object_file.section_by_name(".lcovfun$M"))
+                .map(|x| parse_coverage_functions(object_file.endianness(), &x));
+            println!("{:?}", covfun);
         }
 
         todo!()
@@ -162,8 +168,44 @@ fn parse_coverage_functions<'data, 'file>(
     }
 }
 
-fn parse_profile_data<'data, 'file>(endian: Endianness, section: &Section<'data, 'file>) {
-    todo!()
+#[derive(Debug, Clone)]
+pub struct ProfileData {
+    name_md5: i64,
+    structural_hash: u64,
+    counters_len: u32,
+}
+
+fn parse_profile_data<'data, 'file>(
+    endian: Endianness,
+    section: &Section<'data, 'file>,
+) -> Result<Vec<ProfileData>, SectionReadError> {
+    if let Ok(data) = section.data() {
+        let mut bytes = &data[..];
+        let mut res = vec![];
+        let mut next_expected_pointer = None;
+        while !bytes.is_empty() {
+            let name_md5 = endian.read_i64_bytes(bytes[..8].try_into().unwrap());
+            let structural_hash = endian.read_u64_bytes(bytes[8..16].try_into().unwrap());
+            let counter_ptr = endian.read_u64_bytes(bytes[16..24].try_into().unwrap());
+            bytes = &bytes[(24 + 16)..];
+            let counters_len = endian.read_u32_bytes(bytes[..4].try_into().unwrap());
+            if let Some(next_ptr) = next_expected_pointer {
+                if next_ptr != counter_ptr {
+                    panic!("The pointers don't match");
+                }
+            }
+            next_expected_pointer = Some(counter_ptr + 8 * counters_len as u64);
+            bytes = &bytes[8..];
+            res.push(ProfileData {
+                name_md5,
+                structural_hash,
+                counters_len,
+            });
+        }
+        Ok(res)
+    } else {
+        Err(SectionReadError::EmptyData)
+    }
 }
 
 fn parse_profile_counters<'data, 'file>(
