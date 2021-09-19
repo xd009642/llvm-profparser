@@ -185,8 +185,10 @@ fn parse_mapping_regions<'a>(
             let line_end = line_start + lines_len as usize;
             last_line = line_end;
 
+            let kind = RegionKind::Code;
+            // Add region working-out-stuff
             mapping.push(CounterMappingRegion {
-                kind: RegionKind::Code, // TODO what am I?
+                kind,
                 count: counter,
                 file_id: *i as usize,
                 expanded_file_id: *i as usize, // TODO what am I?
@@ -194,7 +196,6 @@ fn parse_mapping_regions<'a>(
                 line_end,
                 column_start: column_start as usize,
                 column_end: column_end as usize,
-                execution_count: None, // TODO Shouldn't I know this?
             });
         }
     }

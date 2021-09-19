@@ -69,7 +69,7 @@ impl Counter {
     const ENCODING_COUNTER_TAG_AND_EXP_REGION_TAG_BITS: usize = 4;
 }
 
-/// The thing
+/// Associates a source code reader with a specific counter
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct CounterMappingRegion {
     kind: RegionKind,
@@ -80,9 +80,6 @@ pub struct CounterMappingRegion {
     column_start: usize,
     line_end: usize,
     column_end: usize,
-    /// This is in the CountedRegion, but I don't see the need to do another type like when they
-    /// inherit in llvm. After all there are no overloads
-    execution_count: Option<u64>,
 }
 
 pub struct CoverageSegment {
