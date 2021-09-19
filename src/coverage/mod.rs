@@ -57,6 +57,7 @@ pub struct Counter {
     id: u64,
 }
 
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub struct Expression {
     lhs: Counter,
     rhs: Counter,
@@ -68,6 +69,7 @@ impl Counter {
     const ENCODING_COUNTER_TAG_AND_EXP_REGION_TAG_BITS: usize = 4;
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct CounterMappingRegion {
     kind: RegionKind,
     count: Counter,

@@ -128,18 +128,22 @@ fn parse_coverage_functions<'data, 'file>(
                 func_hash,
                 filenames_ref,
             };
+            println!("Header: {:?}", header);
             bytes = &bytes[28..];
             let start_len = bytes.len();
 
             let (data, id_len) = parse_leb128(bytes).unwrap();
+            println!("Filename ids: {}", id_len);
             bytes = data;
             let mut filename_indices = vec![];
             for _ in 0..id_len {
-                let (data, id) = parse_leb128(bytes).unwrap();
+                let (data, id) = parse_leb128(bytes).unwrap(); // Issue
+                println!("ID: {}", id);
                 filename_indices.push(id);
                 bytes = data;
             }
             let (data, expr_len) = parse_leb128(bytes).unwrap();
+            println!("exprs: {}", expr_len);
             bytes = data;
             let mut exprs = vec![];
             for _ in 0..expr_len {
@@ -150,6 +154,13 @@ fn parse_coverage_functions<'data, 'file>(
                 exprs.push(Expression { lhs, rhs });
                 bytes = data;
             }
+            println!("Exprs: {:?}", exprs);
+
+            // MAPPING REGIONS! TODO YOu need to get lines and cols n shit fam
+            let (data, mappings) = parse_mapping_regions(bytes, &filename_indices).unwrap();
+            println!("Mappings: {:?}", mappings);
+            bytes = data;
+
             let function_len = start_len - bytes.len(); // this should match header
 
             let padding = if function_len < section_len && (function_len & 0x07) != 0 {
@@ -157,6 +168,7 @@ fn parse_coverage_functions<'data, 'file>(
             } else {
                 0
             };
+            println!("Padding: {}", padding);
             bytes = &bytes[padding..];
 
             // Now apply padding, and if hash is 0 move on as it's a dummy otherwise add to result
@@ -166,6 +178,45 @@ fn parse_coverage_functions<'data, 'file>(
     } else {
         Err(SectionReadError::EmptyData)
     }
+}
+
+fn parse_mapping_regions<'a>(
+    mut bytes: &'a [u8],
+    file_indices: &[u64],
+) -> IResult<&'a [u8], Vec<CounterMappingRegion>> {
+    let mut mapping = vec![];
+    for i in file_indices {
+        let (data, regions_len) = parse_leb128(bytes)?;
+        println!("{} regions in fileid {}", regions_len, i);
+        bytes = data;
+        let mut last_line = 0;
+        for _ in 0..regions_len {
+            let (data, raw_header) = parse_leb128(bytes)?;
+            let (data, delta_line) = parse_leb128(data)?;
+            let (data, column_start) = parse_leb128(data)?;
+            let (data, lines_len) = parse_leb128(data)?;
+            let (data, column_end) = parse_leb128(data)?;
+            bytes = data;
+
+            let counter = parse_counter(raw_header as u64);
+            let line_start = last_line + delta_line as usize;
+            let line_end = line_start + lines_len as usize;
+            last_line = line_end;
+
+            mapping.push(CounterMappingRegion {
+                kind: RegionKind::Code, // TODO what am I?
+                count: counter,
+                file_id: *i as usize,
+                expanded_file_id: *i as usize, // TODO what am I?
+                line_start,
+                line_end,
+                column_start: column_start as usize,
+                column_end: column_end as usize,
+                execution_count: None, // TODO Shouldn't I know this?
+            });
+        }
+    }
+    Ok((bytes, mapping))
 }
 
 #[derive(Debug, Clone)]
