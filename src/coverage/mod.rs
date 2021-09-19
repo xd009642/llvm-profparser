@@ -69,6 +69,7 @@ impl Counter {
     const ENCODING_COUNTER_TAG_AND_EXP_REGION_TAG_BITS: usize = 4;
 }
 
+/// The thing
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct CounterMappingRegion {
     kind: RegionKind,
@@ -104,4 +105,5 @@ pub struct FunctionRecordHeader {
 #[derive(Debug, Clone)]
 pub struct FunctionRecordV3 {
     header: FunctionRecordHeader,
+    regions: Vec<CounterMappingRegion>,
 }

@@ -28,18 +28,21 @@ impl<'a> CoverageMapping<'a> {
                 .section_by_name("__llvm_covmap")
                 .or(object_file.section_by_name(".lcovmap$M"))
                 .map(|x| parse_coverage_mapping(object_file.endianness(), &x));
+            println!("{:?}", covmap);
 
             // names
             let prof_names = object_file
                 .section_by_name("__llvm_prf_names")
                 .or(object_file.section_by_name(".lprfn$M"))
                 .map(|x| parse_profile_names(&x));
+            println!("{:?}", prof_names);
 
             // counters
             let prof_counts = object_file
                 .section_by_name("__llvm_prf_cnts")
                 .or(object_file.section_by_name(".lprfc$M"))
                 .map(|x| parse_profile_counters(object_file.endianness(), &x));
+            println!("{:?}", prof_counts);
 
             // Data
             let prof_data = object_file
@@ -47,20 +50,18 @@ impl<'a> CoverageMapping<'a> {
                 .or(object_file.section_by_name(".lprfd$M"))
                 .map(|x| parse_profile_data(object_file.endianness(), &x));
 
-            // I don't think I need vnodes currently?
-            println!("{:?}", covmap);
-            println!("{:?}", prof_names);
-            println!("{:?}", prof_counts);
             println!("{:?}", prof_data);
 
             let covfun = object_file
                 .section_by_name("__llvm_covfun")
                 .or(object_file.section_by_name(".lcovfun$M"))
                 .map(|x| parse_coverage_functions(object_file.endianness(), &x));
-            println!("{:?}", covfun);
-        }
 
-        todo!()
+            println!("{:?}", covfun);
+
+            // TODO I don't think I need vnodes currently?
+        }
+        todo!();
     }
 }
 
@@ -69,7 +70,6 @@ fn parse_coverage_mapping<'data, 'file>(
     section: &Section<'data, 'file>,
 ) -> Result<Vec<String>, SectionReadError> {
     if let Ok(data) = section.data() {
-        println!("Length: {}", data.len());
         // Read the number of affixed function records (now just 0 as not in this header)
         debug_assert_eq!(endian.read_i32_bytes(data[0..4].try_into().unwrap()), 0);
         let filename_data_len = endian.read_i32_bytes(data[4..8].try_into().unwrap());
@@ -77,10 +77,6 @@ fn parse_coverage_mapping<'data, 'file>(
         // as not in this header)
         debug_assert_eq!(endian.read_i32_bytes(data[8..12].try_into().unwrap()), 0);
         let format_version = endian.read_i32_bytes(data[12..16].try_into().unwrap());
-        println!(
-            "Filename len {} format_version {}",
-            filename_data_len, format_version
-        );
 
         //let bytes = &data[16..(16 + filename_data_len as usize)];
         let bytes = &data[16..];
@@ -92,13 +88,6 @@ fn parse_coverage_mapping<'data, 'file>(
             bytes = by;
             file_strings.push(string.trim().to_string());
         }
-
-        println!(
-            "Filecount {} remaining: {}\n strings: {:?}",
-            file_count,
-            bytes.len(),
-            file_strings
-        );
 
         // What do I do with the rest of the bytes? Who knows?
         println!("leftovers?: {:?}", bytes);
@@ -128,22 +117,18 @@ fn parse_coverage_functions<'data, 'file>(
                 func_hash,
                 filenames_ref,
             };
-            println!("Header: {:?}", header);
+            let start_len = bytes[28..].len();
             bytes = &bytes[28..];
-            let start_len = bytes.len();
 
             let (data, id_len) = parse_leb128(bytes).unwrap();
-            println!("Filename ids: {}", id_len);
             bytes = data;
             let mut filename_indices = vec![];
             for _ in 0..id_len {
                 let (data, id) = parse_leb128(bytes).unwrap(); // Issue
-                println!("ID: {}", id);
                 filename_indices.push(id);
                 bytes = data;
             }
             let (data, expr_len) = parse_leb128(bytes).unwrap();
-            println!("exprs: {}", expr_len);
             bytes = data;
             let mut exprs = vec![];
             for _ in 0..expr_len {
@@ -154,25 +139,23 @@ fn parse_coverage_functions<'data, 'file>(
                 exprs.push(Expression { lhs, rhs });
                 bytes = data;
             }
-            println!("Exprs: {:?}", exprs);
 
             // MAPPING REGIONS! TODO YOu need to get lines and cols n shit fam
-            let (data, mappings) = parse_mapping_regions(bytes, &filename_indices).unwrap();
-            println!("Mappings: {:?}", mappings);
+            let (data, regions) = parse_mapping_regions(bytes, &filename_indices).unwrap();
             bytes = data;
 
-            let function_len = start_len - bytes.len(); // this should match header
+            let function_len = section_len - bytes.len(); // this should match header
 
             let padding = if function_len < section_len && (function_len & 0x07) != 0 {
                 8 - (function_len & 0x07)
             } else {
                 0
             };
-            println!("Padding: {}", padding);
-            bytes = &bytes[padding..];
-
             // Now apply padding, and if hash is 0 move on as it's a dummy otherwise add to result
             // And decide what end type will be
+            bytes = &bytes[padding..];
+
+            res.push(FunctionRecordV3 { header, regions });
         }
         Ok(res)
     } else {
@@ -187,7 +170,6 @@ fn parse_mapping_regions<'a>(
     let mut mapping = vec![];
     for i in file_indices {
         let (data, regions_len) = parse_leb128(bytes)?;
-        println!("{} regions in fileid {}", regions_len, i);
         bytes = data;
         let mut last_line = 0;
         for _ in 0..regions_len {
