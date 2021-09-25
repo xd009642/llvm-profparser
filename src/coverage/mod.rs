@@ -1,4 +1,5 @@
 use nom::IResult;
+use std::convert::TryFrom;
 
 pub mod coverage_mapping;
 
@@ -18,16 +19,30 @@ pub enum ExprKind {
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub enum RegionKind {
     /// A Code Region associates some code with a counter
-    Code,
+    Code = 0,
     /// An Expansion Region represents a file expansion region that associates a source range with
     /// the expansion of a virtual source file, such as for a macro instantiation or include file
-    Expansion,
+    Expansion = 1,
     /// A Skipped  Region represents a source range with code that was skipped by a preprocessor or
     /// similar means
-    Skipped,
+    Skipped = 2,
     /// A Gap Region is like a Code Region but its count is only set as the line execution count
     /// when its the only region in the line
-    Gap,
+    Gap = 3,
+}
+
+impl TryFrom<u64> for RegionKind {
+    type Error = ();
+
+    fn try_from(v: u64) -> Result<Self, Self::Error> {
+        match v {
+            0 => Ok(RegionKind::Code),
+            1 => Ok(RegionKind::Expansion),
+            2 => Ok(RegionKind::Skipped),
+            3 => Ok(RegionKind::Gap),
+            _ => Err(()),
+        }
+    }
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
@@ -39,7 +54,7 @@ pub enum CounterType {
 }
 
 pub(crate) fn parse_counter(input: u64) -> Counter {
-    let ty = (0x3 & input) as u8;
+    let ty = (Counter::ENCODING_TAG_MASK & input) as u8;
     let kind = match ty {
         0 => CounterType::Zero,
         1 => CounterType::ProfileInstrumentation,
@@ -64,9 +79,10 @@ pub struct Expression {
 }
 
 impl Counter {
-    const ENCODING_TAG_BITS: usize = 2;
-    const ENCODING_TAG_MASK: usize = 3;
-    const ENCODING_COUNTER_TAG_AND_EXP_REGION_TAG_BITS: usize = 4;
+    const ENCODING_TAG_BITS: u64 = 2;
+    const ENCODING_TAG_MASK: u64 = 3;
+    const ENCODING_TAG_AND_EXP_REGION_BITS: u64 = 3;
+    const ENCODING_EXPANSION_REGION_BIT: u64 = 4;
 }
 
 /// Associates a source code reader with a specific counter

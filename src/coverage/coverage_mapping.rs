@@ -173,29 +173,51 @@ fn parse_mapping_regions<'a>(
         bytes = data;
         let mut last_line = 0;
         for _ in 0..regions_len {
+            let mut kind = RegionKind::Code;
             let (data, raw_header) = parse_leb128(bytes)?;
             let (data, delta_line) = parse_leb128(data)?;
             let (data, column_start) = parse_leb128(data)?;
             let (data, lines_len) = parse_leb128(data)?;
             let (data, column_end) = parse_leb128(data)?;
             bytes = data;
+            let mut expanded_file_id = 0;
+            let counter = parse_counter(raw_header);
+            if counter.kind == CounterType::Zero {
+                if raw_header & Counter::ENCODING_EXPANSION_REGION_BIT > 0 {
+                    kind = RegionKind::Expansion;
+                    expanded_file_id = raw_header >> Counter::ENCODING_TAG_AND_EXP_REGION_BITS;
+                    if expanded_file_id >= file_indices.len() as u64 {
+                        todo!()
+                    }
+                } else {
+                    let shifted_counter = raw_header >> Counter::ENCODING_TAG_AND_EXP_REGION_BITS;
+                    match shifted_counter.try_into() {
+                        Ok(RegionKind::Code | RegionKind::Skipped) => break,
+                        _ => panic!("Malformed"),
+                    }
+                }
+            }
 
-            let counter = parse_counter(raw_header as u64);
+            let (column_start, column_end) = if column_start == 0 && column_end == 0 {
+                (1usize, usize::MAX)
+            } else {
+                (column_start as usize, column_end as usize)
+            };
+
             let line_start = last_line + delta_line as usize;
             let line_end = line_start + lines_len as usize;
             last_line = line_end;
 
-            let kind = RegionKind::Code;
             // Add region working-out-stuff
             mapping.push(CounterMappingRegion {
                 kind,
                 count: counter,
                 file_id: *i as usize,
-                expanded_file_id: *i as usize, // TODO what am I?
+                expanded_file_id: expanded_file_id as _,
                 line_start,
                 line_end,
-                column_start: column_start as usize,
-                column_end: column_end as usize,
+                column_start,
+                column_end,
             });
         }
     }
