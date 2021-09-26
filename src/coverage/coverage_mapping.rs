@@ -206,7 +206,7 @@ fn parse_mapping_regions<'a>(
 
             let line_start = last_line + delta_line as usize;
             let line_end = line_start + lines_len as usize;
-            last_line = line_end;
+            last_line = line_start;
 
             // Add region working-out-stuff
             mapping.push(CounterMappingRegion {
