@@ -69,29 +69,35 @@ fn parse_coverage_mapping<'data, 'file>(
     endian: Endianness,
     section: &Section<'data, 'file>,
 ) -> Result<Vec<String>, SectionReadError> {
-    if let Ok(data) = section.data() {
-        // Read the number of affixed function records (now just 0 as not in this header)
-        debug_assert_eq!(endian.read_i32_bytes(data[0..4].try_into().unwrap()), 0);
-        let filename_data_len = endian.read_i32_bytes(data[4..8].try_into().unwrap());
-        // Read the length of the affixed string that contains encoded coverage mapping data (now 0
-        // as not in this header)
-        debug_assert_eq!(endian.read_i32_bytes(data[8..12].try_into().unwrap()), 0);
-        let format_version = endian.read_i32_bytes(data[12..16].try_into().unwrap());
-
-        //let bytes = &data[16..(16 + filename_data_len as usize)];
-        let bytes = &data[16..];
-        let (bytes, file_count) = parse_leb128(bytes).unwrap();
+    if let Ok(mut data) = section.data() {
         let mut file_strings = vec![];
-        let mut bytes = bytes;
-        for _ in 0..file_count {
-            let (by, string) = parse_string_ref(bytes).unwrap();
-            bytes = by;
-            file_strings.push(string.trim().to_string());
+        while !data.is_empty() {
+            let data_len = data.len();
+            // Read the number of affixed function records (now just 0 as not in this header)
+            debug_assert_eq!(endian.read_i32_bytes(data[0..4].try_into().unwrap()), 0);
+            let filename_data_len = endian.read_i32_bytes(data[4..8].try_into().unwrap());
+            // Read the length of the affixed string that contains encoded coverage mapping data (now 0
+            // as not in this header)
+            debug_assert_eq!(endian.read_i32_bytes(data[8..12].try_into().unwrap()), 0);
+            let format_version = endian.read_i32_bytes(data[12..16].try_into().unwrap());
+
+            //let bytes = &data[16..(16 + filename_data_len as usize)];
+            let bytes = &data[16..];
+            let (bytes, file_count) = parse_leb128(bytes).unwrap();
+            let mut bytes = bytes;
+            for _ in 0..file_count {
+                let (by, string) = parse_string_ref(bytes).unwrap();
+                bytes = by;
+                file_strings.push(string.trim().to_string());
+            }
+            let read_len = data_len - bytes.len();
+            let padding = if !bytes.is_empty() && (read_len & 0x07) != 0 {
+                8 - (read_len & 0x07)
+            } else {
+                0
+            };
+            data = &bytes[padding..];
         }
-
-        // What do I do with the rest of the bytes? Who knows?
-        println!("leftovers?: {:?}", bytes);
-
         Ok(file_strings)
     } else {
         Err(SectionReadError::EmptyData)
