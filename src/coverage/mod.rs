@@ -3,6 +3,22 @@ use std::convert::TryFrom;
 
 pub mod coverage_mapping;
 
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
+pub struct CoverageMappingInfo {
+    cov_map: Vec<String>,
+    cov_fun: Vec<FunctionRecordV3>,
+    prof_names: Vec<String>,
+    prof_counts: Vec<u64>,
+    prof_data: Vec<ProfileData>,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
+pub struct ProfileData {
+    name_md5: i64,
+    structural_hash: u64,
+    counters_len: u32,
+}
+
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub enum CounterKind {
     Zero,
@@ -98,6 +114,7 @@ pub struct CounterMappingRegion {
     column_end: usize,
 }
 
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub struct CoverageSegment {
     line: usize,
     col: usize,
@@ -107,7 +124,7 @@ pub struct CoverageSegment {
     is_gap_region: usize,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub struct FunctionRecordHeader {
     name_hash: i64,
     data_len: u32,
@@ -115,7 +132,7 @@ pub struct FunctionRecordHeader {
     filenames_ref: u64,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub struct FunctionRecordV3 {
     header: FunctionRecordHeader,
     regions: Vec<CounterMappingRegion>,
