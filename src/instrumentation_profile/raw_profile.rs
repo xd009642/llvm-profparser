@@ -213,7 +213,7 @@ where
             result.version = Some(header.version & !VARIANT_MASKS_ALL);
             result.is_ir = (header.version & VARIANT_MASK_IR_PROF) != 0;
             result.has_csir = (header.version & VARIANT_MASK_CSIR_PROF) != 0;
-            input = bytes;
+            input = &bytes[(header.binary_ids_len as usize)..];
             let mut data_section = vec![];
             for _ in 0..header.data_len {
                 let (bytes, data) = ProfileData::<T>::parse(input, header.endianness)?;
@@ -272,7 +272,6 @@ where
                 7 => nom_u64(endianness)(&bytes[..])?,
                 _ => (bytes, 0),
             };
-            debug_assert_eq!(binary_ids_len, 0);
             let (bytes, data_len) = nom_u64(endianness)(&bytes[..])?;
             let (bytes, padding_bytes_before_counters) = nom_u64(endianness)(&bytes[..])?;
             let (bytes, counters_len) = nom_u64(endianness)(&bytes[..])?;
