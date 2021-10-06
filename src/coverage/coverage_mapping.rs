@@ -8,6 +8,10 @@ use std::fmt;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+pub struct CoverageMapping<'a> {
+    profile: &'a InstrumentationProfile,
+}
+
 #[derive(Copy, Clone, Debug)]
 pub enum LlvmSection {
     CoverageMap,
@@ -33,10 +37,6 @@ impl fmt::Display for SectionReadError {
 }
 
 impl Error for SectionReadError {}
-
-pub struct CoverageMapping<'a> {
-    profile: &'a InstrumentationProfile,
-}
 
 pub fn read_object_file(object: &Path) -> Result<CoverageMappingInfo, Box<dyn Error>> {
     // I believe vnode sections added by llvm are unnecessary
@@ -89,11 +89,12 @@ impl<'a> CoverageMapping<'a> {
         object_files: &[PathBuf],
         profile: &'a InstrumentationProfile,
     ) -> Result<Self, Box<dyn Error>> {
-        let mappings = object_files
-            .iter()
-            .map(|x| read_object_file(x.as_path()))
-            .collect::<Vec<_>>();
-        println!("{:?}", mappings);
+        println!("Profile:\n{:?}", profile);
+        let mut mappings = vec![];
+        for file in object_files {
+            mappings.push(read_object_file(file.as_path())?);
+        }
+        println!("Mappings:\n{:?}", mappings);
         todo!();
     }
 }
@@ -146,9 +147,9 @@ fn parse_coverage_functions<'data, 'file>(
         let mut res = vec![];
         let section_len = bytes.len();
         while !bytes.is_empty() {
-            let name_hash = endian.read_i64_bytes(bytes[0..8].try_into().unwrap());
+            let name_hash = endian.read_u64_bytes(bytes[0..8].try_into().unwrap());
             let data_len = endian.read_u32_bytes(bytes[8..12].try_into().unwrap());
-            let func_hash = endian.read_i64_bytes(bytes[12..20].try_into().unwrap());
+            let func_hash = endian.read_u64_bytes(bytes[12..20].try_into().unwrap());
             let filenames_ref = endian.read_u64_bytes(bytes[20..28].try_into().unwrap());
             let header = FunctionRecordHeader {
                 name_hash,
@@ -274,7 +275,7 @@ fn parse_profile_data<'data, 'file>(
         let mut res = vec![];
         let mut next_expected_pointer = None;
         while !bytes.is_empty() {
-            let name_md5 = endian.read_i64_bytes(bytes[..8].try_into().unwrap());
+            let name_md5 = endian.read_u64_bytes(bytes[..8].try_into().unwrap());
             let structural_hash = endian.read_u64_bytes(bytes[8..16].try_into().unwrap());
             let counter_ptr = endian.read_u64_bytes(bytes[16..24].try_into().unwrap());
             bytes = &bytes[(24 + 16)..];

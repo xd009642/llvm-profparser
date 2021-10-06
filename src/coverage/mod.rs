@@ -14,7 +14,7 @@ pub struct CoverageMappingInfo {
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub struct ProfileData {
-    name_md5: i64,
+    name_md5: u64,
     structural_hash: u64,
     counters_len: u32,
 }
@@ -126,9 +126,9 @@ pub struct CoverageSegment {
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub struct FunctionRecordHeader {
-    name_hash: i64,
+    name_hash: u64,
     data_len: u32,
-    func_hash: i64,
+    func_hash: u64,
     filenames_ref: u64,
 }
 
