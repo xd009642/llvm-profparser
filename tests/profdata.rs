@@ -6,7 +6,24 @@ use std::fs::read_dir;
 use std::path::PathBuf;
 use std::process::Command;
 
+#[cfg(llvm_11)]
 fn get_data_dir() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/llvm-11")
+}
+
+#[cfg(llvm_12)]
+fn get_data_dir() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/llvm-12")
+}
+
+#[cfg(llvm_13)]
+fn get_data_dir() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/llvm-13")
+}
+
+#[cfg(not(any(llvm_11, llvm_12, llvm_13)))]
+fn get_data_dir() -> PathBuf {
+    // Nothing to do so lets get a directory with nothing in
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data")
 }
 
@@ -58,6 +75,7 @@ fn check_command(ext: &OsStr) {
     // TODO we should consider doing different permutations of args. Some things which rely on
     // the ordering of elements in a priority_queue etc will display differently though...
     let data = get_data_dir();
+    println!("Data directory: {}", data.display());
     let mut count = 0;
     for raw_file in read_dir(&data)
         .unwrap()
