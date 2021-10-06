@@ -78,7 +78,7 @@ pub(crate) fn parse_counter(input: u64) -> Counter {
         3 => CounterType::AdditionExpr,
         _ => unreachable!(),
     };
-    let id = (input >> 2); // For zero we don't actually care about this but we'll still do it
+    let id = input >> 2; // For zero we don't actually care about this but we'll still do it
     Counter { kind, id }
 }
 

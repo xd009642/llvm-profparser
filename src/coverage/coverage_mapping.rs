@@ -234,7 +234,7 @@ fn parse_mapping_regions<'a>(
                 } else {
                     let shifted_counter = raw_header >> Counter::ENCODING_TAG_AND_EXP_REGION_BITS;
                     match shifted_counter.try_into() {
-                        Ok(RegionKind::Code | RegionKind::Skipped) => break,
+                        Ok(RegionKind::Code) | Ok(RegionKind::Skipped) => break,
                         _ => panic!("Malformed"),
                     }
                 }
