@@ -2,7 +2,7 @@ use crate::instrumentation_profile::types::*;
 use crate::instrumentation_profile::InstrProfReader;
 use nom::branch::alt;
 use nom::bytes::complete::{tag, tag_no_case, take_until};
-use nom::character::is_digit;
+use nom::character::{complete::one_of, is_digit};
 use nom::error::{Error, ErrorKind};
 use nom::multi::*;
 use nom::sequence::*;
@@ -49,7 +49,9 @@ fn valid_name_char(character: u8) -> bool {
     c.is_ascii() && c != '\n' && c != '\r'
 }
 
-named!(strip_whitespace<&[u8], ()>, map!(one_of!(&b" \n\r\t"[..]), |_|()));
+fn strip_whitespace(s: &[u8]) -> IResult<&[u8], ()> {
+    one_of(&b" \n\r\t"[..])(s).map(|(b, _)| (b, ()))
+}
 
 named!(strip_comments<&[u8], ()>,
     map!(delimited!(tag!(b"#"), take_until!("\n"), tag!("\n")), |_|())
