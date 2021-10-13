@@ -53,6 +53,7 @@ where
 pub struct Header {
     endianness: Endianness,
     pub version: u64,
+    pub binary_ids_len: u64,
     pub data_len: u64,
     pub padding_bytes_before_counters: u64,
     pub counters_len: u64,
@@ -208,11 +209,11 @@ where
         if !input.is_empty() {
             let mut result = InstrumentationProfile::default();
             let (bytes, header) = Self::parse_header(input)?;
-
+            // LLVM 11 and 12 are version 5. LLVM 13 is version 7
             result.version = Some(header.version & !VARIANT_MASKS_ALL);
             result.is_ir = (header.version & VARIANT_MASK_IR_PROF) != 0;
             result.has_csir = (header.version & VARIANT_MASK_CSIR_PROF) != 0;
-            input = bytes;
+            input = &bytes[(header.binary_ids_len as usize)..];
             let mut data_section = vec![];
             for _ in 0..header.data_len {
                 let (bytes, data) = ProfileData::<T>::parse(input, header.endianness)?;
@@ -267,6 +268,10 @@ where
         if Self::has_format(input) {
             let endianness = file_endianness::<T>(&input[..8].try_into().unwrap());
             let (bytes, version) = nom_u64(endianness)(&input[8..])?;
+            let (bytes, binary_ids_len) = match version & !VARIANT_MASKS_ALL {
+                7 => nom_u64(endianness)(&bytes[..])?,
+                _ => (bytes, 0),
+            };
             let (bytes, data_len) = nom_u64(endianness)(&bytes[..])?;
             let (bytes, padding_bytes_before_counters) = nom_u64(endianness)(&bytes[..])?;
             let (bytes, counters_len) = nom_u64(endianness)(&bytes[..])?;
@@ -279,6 +284,7 @@ where
             let result = Header {
                 endianness,
                 version,
+                binary_ids_len,
                 data_len,
                 padding_bytes_before_counters,
                 counters_len,

@@ -165,7 +165,6 @@ impl PartialEq for HotFn {
 impl ShowCommand {
     pub fn run(&self) -> Result<(), Box<dyn std::error::Error>> {
         let profile = parse(&self.input)?;
-        //println!("{:?}", profile);
         let mut summary = ProfileSummary::new();
         let mut stats = vec![ValueSiteStats::default(); ValueKind::len()];
 
@@ -276,11 +275,15 @@ impl ShowCommand {
             }
         }
         if profile.get_level() == InstrumentationLevel::Ir {
+            // This is just to enable same printout in older versions with llvm 11
+            #[cfg(not(llvm_11))]
             println!(
                 "Instrumentation level: {}  entry_first = {}",
                 profile.get_level(),
                 profile.is_entry_first() as usize
             );
+            #[cfg(llvm_11)]
+            println!("Instrumentation level: {}", profile.get_level());
         } else {
             println!("Instrumentation level: {}", profile.get_level());
         }

@@ -1,7 +1,11 @@
 use crate::instrumentation_profile::types::*;
 use crate::instrumentation_profile::InstrProfReader;
+use nom::branch::alt;
+use nom::bytes::complete::{tag, tag_no_case, take_until};
 use nom::character::is_digit;
 use nom::error::{Error, ErrorKind};
+use nom::multi::*;
+use nom::sequence::*;
 use nom::*;
 use std::io::Read;
 
@@ -53,15 +57,19 @@ named!(strip_comments<&[u8], ()>,
 
 named!(skip_to_content<&[u8], ()>, map!(many0!(alt!(strip_whitespace | strip_comments)), |_|()));
 
-named!(
-    parse_header<&[u8], Option<&[u8]>>,
-    opt!(delimited!(
-        tag!(b":"),
-        alt!(tag_no_case!(IR_TAG) | tag_no_case!(FE_TAG) | tag_no_case!(CSIR_TAG)| tag_no_case!(ENTRY_TAG) |
-             tag_no_case!(NOT_ENTRY_TAG) | take_until!("\n")),
-        tag!(b"\n")
-    ))
-);
+fn match_header_tags(s: &[u8]) -> IResult<&[u8], &[u8]> {
+    alt((
+        tag_no_case(IR_TAG),
+        tag_no_case(FE_TAG),
+        tag_no_case(CSIR_TAG),
+        tag_no_case(ENTRY_TAG),
+        take_until("\n"),
+    ))(s)
+}
+
+fn parse_header_tags(s: &[u8]) -> IResult<&[u8], Vec<&[u8]>> {
+    many0(delimited(tag(b":"), match_header_tags, tag("\n")))(s)
+}
 
 named!(
     read_line,
@@ -210,24 +218,22 @@ impl InstrProfReader for TextInstrProf {
 
     fn parse_header(input: &[u8]) -> IResult<&[u8], Self::Header> {
         let (input, _) = skip_to_content(input)?;
-        let (bytes, name) = parse_header(input)?;
-        // TODO does this work on multiline headers?
-        let (is_ir_level, has_csir, entry_first) = match name {
-            Some(name) => {
-                if check_tag(name, IR_TAG) | check_tag(name, NOT_ENTRY_TAG) {
-                    (true, false, false)
-                } else if check_tag(name, FE_TAG) {
-                    (false, false, false)
-                } else if check_tag(name, CSIR_TAG) {
-                    (true, true, false)
-                } else if check_tag(name, ENTRY_TAG) {
-                    (false, false, true)
-                } else {
-                    return Err(Err::Failure(Error::new(bytes, ErrorKind::Tag)));
-                }
+        let (bytes, names) = parse_header_tags(input)?;
+        let mut is_ir_level = false;
+        let mut has_csir = false;
+        let mut entry_first = false;
+        for name in &names {
+            if check_tag(name, IR_TAG) | check_tag(name, NOT_ENTRY_TAG) {
+                is_ir_level = true;
+            } else if check_tag(name, CSIR_TAG) {
+                has_csir = true;
+                is_ir_level = true;
+            } else if check_tag(name, ENTRY_TAG) {
+                entry_first = true;
+            } else if !check_tag(name, FE_TAG) {
+                return Err(Err::Failure(Error::new(bytes, ErrorKind::Tag)));
             }
-            None => (false, false, false),
-        };
+        }
         Ok((
             bytes,
             Header {
@@ -290,6 +296,14 @@ mod tests {
         let (_, header) = TextInstrProf::parse_header(&no_header[..]).unwrap();
         assert!(!header.is_ir_level);
         assert!(!header.has_csir);
+    }
+
+    #[test]
+    fn parse_multiline_header() {
+        let header = b":entry_first\n:ir\n#content";
+        let (_, header) = TextInstrProf::parse_header(&header[..]).unwrap();
+        assert!(header.is_ir_level);
+        assert!(header.entry_first);
     }
 
     #[test]
