@@ -53,9 +53,9 @@ fn strip_whitespace(s: &[u8]) -> IResult<&[u8], ()> {
     one_of(&b" \n\r\t"[..])(s).map(|(b, _)| (b, ()))
 }
 
-named!(strip_comments<&[u8], ()>,
-    map!(delimited!(tag!(b"#"), take_until!("\n"), tag!("\n")), |_|())
-);
+fn strip_comments(s: &[u8]) -> IResult<&[u8], ()> {
+    delimited(tag(b"#"), take_until("\n"), tag("\n"))(s).map(|(b, _)| (b, ()))
+}
 
 named!(skip_to_content<&[u8], ()>, map!(many0!(alt!(strip_whitespace | strip_comments)), |_|()));
 
