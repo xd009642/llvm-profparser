@@ -1,7 +1,7 @@
 use crate::instrumentation_profile::types::*;
 use crate::instrumentation_profile::InstrProfReader;
 use nom::branch::alt;
-use nom::bytes::complete::{tag, tag_no_case, take_until};
+use nom::bytes::complete::{tag, tag_no_case, take_until, take_while1};
 use nom::character::{complete::one_of, is_digit};
 use nom::error::{Error, ErrorKind};
 use nom::multi::*;
@@ -57,7 +57,9 @@ fn strip_comments(s: &[u8]) -> IResult<&[u8], ()> {
     delimited(tag(b"#"), take_until("\n"), tag("\n"))(s).map(|(b, _)| (b, ()))
 }
 
-named!(skip_to_content<&[u8], ()>, map!(many0!(alt!(strip_whitespace | strip_comments)), |_|()));
+fn skip_to_content(s: &[u8]) -> IResult<&[u8], ()> {
+    many0(alt((strip_whitespace, strip_comments)))(s).map(|(b, _)| (b, ()))
+}
 
 fn match_header_tags(s: &[u8]) -> IResult<&[u8], &[u8]> {
     alt((
@@ -73,22 +75,23 @@ fn parse_header_tags(s: &[u8]) -> IResult<&[u8], Vec<&[u8]>> {
     many0(delimited(tag(b":"), match_header_tags, tag("\n")))(s)
 }
 
-named!(
-    read_line,
-    map!(tuple!(take_while1!(valid_name_char), tag!(b"\n")), |x| x.0)
-);
+fn read_line(s: &[u8]) -> IResult<&[u8], &[u8]> {
+    tuple((take_while1(valid_name_char), tag(b"\n")))(s).map(|(b, (v, _))| (b, v))
+}
 
-named!(read_digit<&[u8], u64>, map!(tuple!(take_while1!(is_digit), tag!(b"\n")), |x| str_to_digit(x.0)));
+fn read_digit(s: &[u8]) -> IResult<&[u8], u64> {
+    tuple((take_while1(is_digit), tag(b"\n")))(s).map(|(b, v)| (b, str_to_digit(v.0)))
+}
 
-named!(
-    indirect_value_site<&[u8], (&[u8], u64)>,
-    map!(tuple!(take_until!(":"), tag!(":"), take_while1!(is_digit)), |x| (x.0, str_to_digit(x.2)))
-);
+fn indirect_value_site(s: &[u8]) -> IResult<&[u8], (&[u8], u64)> {
+    tuple((take_until(":"), tag(":"), take_while1(is_digit)))(s)
+        .map(|(b, v)| (b, (v.0, str_to_digit(v.2))))
+}
 
-named!(
-    memop_value_site<&[u8], (u64, u64)>,
-    map!(tuple!(take_while1!(is_digit), tag!(":"), take_while1!(is_digit)), |x| (str_to_digit(x.0), str_to_digit(x.2)))
-);
+fn memop_value_site(s: &[u8]) -> IResult<&[u8], (u64, u64)> {
+    tuple((take_while1(is_digit), tag(":"), take_while1(is_digit)))(s)
+        .map(|(b, v)| (b, (str_to_digit(v.0), str_to_digit(v.2))))
+}
 
 fn read_value_profile_data(mut input: &[u8]) -> IResult<&[u8], Option<Box<ValueProfDataRecord>>> {
     if let Ok((bytes, n_kinds)) = read_digit(input) {
