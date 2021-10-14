@@ -2,12 +2,13 @@ use crate::instrumentation_profile::types::*;
 use crate::instrumentation_profile::*;
 use crate::util::parse_string_ref;
 use core::hash::Hash;
+use nom::bytes::complete::take;
 use nom::lib::std::ops::RangeFrom;
 use nom::number::streaming::{u16 as nom_u16, u32 as nom_u32, u64 as nom_u64};
 use nom::number::Endianness;
 use nom::{
     error::{Error, ErrorKind},
-    take, Err, IResult, Needed,
+    Err, IResult, Needed,
 };
 use nom::{InputIter, InputLength, Slice};
 use std::convert::TryInto;
@@ -220,7 +221,7 @@ where
                 data_section.push(data);
                 input = bytes;
             }
-            let (bytes, _) = take!(input, header.padding_bytes_before_counters)?;
+            let (bytes, _) = take(header.padding_bytes_before_counters)(input)?;
             input = bytes;
             let mut counters = vec![];
             for data in &data_section {
@@ -228,7 +229,7 @@ where
                 counters.push(record);
                 input = bytes;
             }
-            let (bytes, _) = take!(input, header.padding_bytes_after_counters)?;
+            let (bytes, _) = take(header.padding_bytes_after_counters)(input)?;
             input = bytes;
             let end_length = input.len() - header.names_len as usize;
             let mut symtab = Symtab::default();
@@ -240,7 +241,7 @@ where
                 }
             }
             let padding = get_num_padding_bytes(header.names_len);
-            let (bytes, _) = take!(input, padding)?;
+            let (bytes, _) = take(padding)(input)?;
             input = bytes;
             for (data, mut record) in data_section.iter().zip(counters.drain(..)) {
                 let (bytes, _) =

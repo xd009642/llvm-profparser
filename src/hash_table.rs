@@ -1,5 +1,5 @@
 use crate::instrumentation_profile::types::*;
-use nom::{number::complete::*, take, IResult};
+use nom::{number::complete::*, IResult};
 use std::borrow::Cow;
 use std::collections::HashMap;
 
