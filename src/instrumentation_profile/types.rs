@@ -105,11 +105,10 @@ impl InstrumentationProfile {
 
     pub fn merge_record(&mut self, record: &NamedInstrProfRecord) {
         if self.symtab.contains(record.hash_unchecked()) {
-            // Find the record and merge tings
+            // Find the record and merge things. 0 hashed records should have no counters in the
+            // code and otherwise we'll ignore the change that truncated md5 hashes can collide
             if let Some(rec) = self.records.iter_mut().find(|x| x.name == record.name) {
                 rec.record.merge(&record.record);
-            } else {
-                panic!("We've fallen victim to a hash collision.");
             }
         } else {
             self.symtab
