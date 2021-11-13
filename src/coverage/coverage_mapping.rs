@@ -43,6 +43,15 @@ pub fn read_object_file(object: &Path) -> Result<CoverageMappingInfo, Box<dyn Er
 
     let binary_data = fs::read(object)?;
     let object_file = object::File::parse(&*binary_data)?;
+
+    let cov_fun = object_file
+        .section_by_name("__llvm_covfun")
+        .or(object_file.section_by_name(".lcovfun$M"))
+        .map(|x| parse_coverage_functions(object_file.endianness(), &x))
+        .ok_or(SectionReadError::MissingSection(
+            LlvmSection::CoverageFunctions,
+        ))??;
+
     let cov_map = object_file
         .section_by_name("__llvm_covmap")
         .or(object_file.section_by_name(".lcovmap$M"))
@@ -67,14 +76,6 @@ pub fn read_object_file(object: &Path) -> Result<CoverageMappingInfo, Box<dyn Er
         .map(|x| parse_profile_data(object_file.endianness(), &x))
         .ok_or(SectionReadError::MissingSection(LlvmSection::ProfileData))??;
 
-    let cov_fun = object_file
-        .section_by_name("__llvm_covfun")
-        .or(object_file.section_by_name(".lcovfun$M"))
-        .map(|x| parse_coverage_functions(object_file.endianness(), &x))
-        .ok_or(SectionReadError::MissingSection(
-            LlvmSection::CoverageFunctions,
-        ))??;
-
     Ok(CoverageMappingInfo {
         cov_map,
         cov_fun,
@@ -89,12 +90,10 @@ impl<'a> CoverageMapping<'a> {
         object_files: &[PathBuf],
         profile: &'a InstrumentationProfile,
     ) -> Result<Self, Box<dyn Error>> {
-        println!("Profile:\n{:?}", profile);
         let mut mappings = vec![];
         for file in object_files {
             mappings.push(read_object_file(file.as_path())?);
         }
-        println!("Mappings:\n{:?}", mappings);
         todo!();
     }
 }
@@ -180,7 +179,6 @@ fn parse_coverage_functions<'data, 'file>(
                 bytes = data;
             }
 
-            // MAPPING REGIONS! TODO YOu need to get lines and cols n shit fam
             let (data, regions) = parse_mapping_regions(bytes, &filename_indices).unwrap();
             bytes = data;
 
@@ -194,6 +192,10 @@ fn parse_coverage_functions<'data, 'file>(
             // Now apply padding, and if hash is 0 move on as it's a dummy otherwise add to result
             // And decide what end type will be
             bytes = &bytes[padding..];
+
+            if func_hash == 0 {
+                continue;
+            }
 
             res.push(FunctionRecordV3 { header, regions });
         }
@@ -214,7 +216,7 @@ fn parse_mapping_regions<'a>(
         let (data, regions_len) = parse_leb128(bytes)?;
         bytes = data;
         let mut last_line = 0;
-        for _ in 0..regions_len {
+        for idx in 0..regions_len {
             let mut kind = RegionKind::Code;
             let (data, raw_header) = parse_leb128(bytes)?;
             let (data, delta_line) = parse_leb128(data)?;
@@ -234,8 +236,8 @@ fn parse_mapping_regions<'a>(
                 } else {
                     let shifted_counter = raw_header >> Counter::ENCODING_TAG_AND_EXP_REGION_BITS;
                     match shifted_counter.try_into() {
-                        Ok(RegionKind::Code) | Ok(RegionKind::Skipped) => break,
-                        _ => panic!("Malformed"),
+                        Ok(RegionKind::Code) | Ok(RegionKind::Skipped) => {}
+                        e => panic!("Malformed: {:?}", e),
                     }
                 }
             }
@@ -282,7 +284,7 @@ fn parse_profile_data<'data, 'file>(
             let counters_len = endian.read_u32_bytes(bytes[..4].try_into().unwrap());
             if let Some(next_ptr) = next_expected_pointer {
                 if next_ptr != counter_ptr {
-                    panic!("The pointers don't match");
+                    println!("The pointers don't match {} {}", next_ptr, counter_ptr);
                 }
             }
             next_expected_pointer = Some(counter_ptr + 8 * counters_len as u64);

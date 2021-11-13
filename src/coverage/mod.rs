@@ -48,7 +48,7 @@ pub enum RegionKind {
 }
 
 impl TryFrom<u64> for RegionKind {
-    type Error = ();
+    type Error = u64;
 
     fn try_from(v: u64) -> Result<Self, Self::Error> {
         match v {
@@ -56,7 +56,7 @@ impl TryFrom<u64> for RegionKind {
             1 => Ok(RegionKind::Expansion),
             2 => Ok(RegionKind::Skipped),
             3 => Ok(RegionKind::Gap),
-            _ => Err(()),
+            e => Err(e),
         }
     }
 }
