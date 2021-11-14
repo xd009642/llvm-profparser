@@ -92,10 +92,12 @@ impl<'a> CoverageMapping<'a> {
         profile: &'a InstrumentationProfile,
     ) -> Result<Self, Box<dyn Error>> {
         let mut mappings = vec![];
+        println!("profile:\n{:#?}", profile);
         for file in object_files {
             mappings.push(read_object_file(file.as_path())?);
         }
-        todo!();
+        println!("Mappings:\n{:#?}", mappings);
+        todo!("Mapping of coverage profile and counters");
     }
 }
 
