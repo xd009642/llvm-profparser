@@ -6,7 +6,7 @@ pub mod coverage_mapping;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct CoverageMappingInfo {
-    cov_map: HashMap<u128, Vec<String>>,
+    cov_map: HashMap<u64, Vec<String>>,
     cov_fun: Vec<FunctionRecordV3>,
     prof_names: Vec<String>,
     prof_counts: Vec<u64>,

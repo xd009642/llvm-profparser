@@ -102,7 +102,7 @@ impl<'a> CoverageMapping<'a> {
 fn parse_coverage_mapping<'data, 'file>(
     endian: Endianness,
     section: &Section<'data, 'file>,
-) -> Result<HashMap<u128, Vec<String>>, SectionReadError> {
+) -> Result<HashMap<u64, Vec<String>>, SectionReadError> {
     if let Ok(mut data) = section.data() {
         let mut result = HashMap::new();
         while !data.is_empty() {
@@ -116,10 +116,7 @@ fn parse_coverage_mapping<'data, 'file>(
             let format_version = endian.read_i32_bytes(data[12..16].try_into().unwrap());
 
             let hash = md5::compute(&data[16..(filename_data_len as usize + 16)]);
-            let hash = match endian {
-                Endianness::Little => u128::from_le_bytes(hash.0),
-                _ => u128::from_be_bytes(hash.0),
-            };
+            let hash = endian.read_u64_bytes(hash.0[..8].try_into().unwrap());
 
             //let bytes = &data[16..(16 + filename_data_len as usize)];
             let bytes = &data[16..];
