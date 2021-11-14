@@ -192,7 +192,7 @@ fn parse_coverage_functions<'data, 'file>(
             bytes = data;
             let function_len = section_len - bytes.len(); // this should match header
 
-            let mut padding = if function_len < section_len && (function_len & 0x07) != 0 {
+            let padding = if function_len < section_len && (function_len & 0x07) != 0 {
                 8 - (function_len & 0x07)
             } else {
                 0
@@ -222,7 +222,7 @@ fn parse_mapping_regions<'a>(
         let (data, regions_len) = parse_leb128(bytes)?;
         bytes = data;
         let mut last_line = 0;
-        for idx in 0..regions_len {
+        for _ in 0..regions_len {
             let mut kind = RegionKind::Code;
             let (data, raw_header) = parse_leb128(bytes)?;
             let (data, delta_line) = parse_leb128(data)?;
@@ -281,20 +281,21 @@ fn parse_profile_data<'data, 'file>(
     if let Ok(data) = section.data() {
         let mut bytes = &data[..];
         let mut res = vec![];
-        let mut next_expected_pointer = None;
         while !bytes.is_empty() {
             let name_md5 = endian.read_u64_bytes(bytes[..8].try_into().unwrap());
             let structural_hash = endian.read_u64_bytes(bytes[8..16].try_into().unwrap());
+
             let counter_ptr = endian.read_u64_bytes(bytes[16..24].try_into().unwrap());
             bytes = &bytes[(24 + 16)..];
             let counters_len = endian.read_u32_bytes(bytes[..4].try_into().unwrap());
-            if let Some(next_ptr) = next_expected_pointer {
-                if next_ptr != counter_ptr {
-                    println!("The pointers don't match {} {}", next_ptr, counter_ptr);
-                }
-            }
-            next_expected_pointer = Some(counter_ptr + 8 * counters_len as u64);
+            // TODO Might need to get the counter offset and get the list of counters from this?
+            // And potentially check against the maximum number of counters just to make sure that
+            // it's not being exceeded?
+            //
+            // Also counters_len >= 1 so this should be checked to make sure it's not malformed
+
             bytes = &bytes[8..];
+
             res.push(ProfileData {
                 name_md5,
                 structural_hash,

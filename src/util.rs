@@ -46,7 +46,7 @@ pub fn parse_string_list(input: &[u8]) -> IResult<&[u8], Vec<String>> {
         decoder.read_to_end(&mut output).unwrap();
         let (compressed_input, values) = match parse_uncompressed_list(&output[..]) {
             Ok((i, v)) => (i, v),
-            Err(mut e) => {
+            Err(e) => {
                 // substitute the decompressed slice start as the error location
                 let e = match e {
                     nom::Err::Error(e) => nom::Err::Error(Error {

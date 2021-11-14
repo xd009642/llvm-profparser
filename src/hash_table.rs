@@ -74,7 +74,7 @@ impl HashTable {
     /// will be used to correct any offsets
     pub(crate) fn parse(input: &[u8], offset: usize, bucket_start: usize) -> IResult<&[u8], Self> {
         assert!(bucket_start > 0);
-        let (bytes, num_buckets) = le_u64(&input[bucket_start..])?;
+        let (bytes, _num_buckets) = le_u64(&input[bucket_start..])?;
         let (bytes, mut num_entries) = le_u64(bytes)?;
         let mut payload = input;
         let mut result = Self::new();
@@ -93,7 +93,7 @@ impl HashTable {
     ) -> IResult<&'a [u8], u64> {
         let (bytes, num_items_in_bucket) = le_u16(input)?;
         let mut remaining = bytes;
-        for i in 0..num_items_in_bucket {
+        for _i in 0..num_items_in_bucket {
             let (bytes, _hash) = le_u64(remaining)?;
             let (bytes, lens) = read_key_data_len(bytes)?;
             let (bytes, key) = read_key(bytes, lens.key_len as usize)?;
