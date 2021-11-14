@@ -1,11 +1,12 @@
 use nom::IResult;
+use std::collections::HashMap;
 use std::convert::TryFrom;
 
 pub mod coverage_mapping;
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct CoverageMappingInfo {
-    cov_map: Vec<String>,
+    cov_map: HashMap<u128, Vec<String>>,
     cov_fun: Vec<FunctionRecordV3>,
     prof_names: Vec<String>,
     prof_counts: Vec<u64>,

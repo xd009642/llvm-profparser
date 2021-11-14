@@ -2,6 +2,7 @@ use crate::coverage::*;
 use crate::instrumentation_profile::types::*;
 use crate::util::*;
 use object::{Endian, Endianness, Object, ObjectSection, Section};
+use std::collections::HashMap;
 use std::convert::TryInto;
 use std::error::Error;
 use std::fmt;
@@ -101,9 +102,9 @@ impl<'a> CoverageMapping<'a> {
 fn parse_coverage_mapping<'data, 'file>(
     endian: Endianness,
     section: &Section<'data, 'file>,
-) -> Result<Vec<String>, SectionReadError> {
+) -> Result<HashMap<u128, Vec<String>>, SectionReadError> {
     if let Ok(mut data) = section.data() {
-        let mut file_strings = vec![];
+        let mut result = HashMap::new();
         while !data.is_empty() {
             let data_len = data.len();
             // Read the number of affixed function records (now just 0 as not in this header)
@@ -114,24 +115,28 @@ fn parse_coverage_mapping<'data, 'file>(
             debug_assert_eq!(endian.read_i32_bytes(data[8..12].try_into().unwrap()), 0);
             let format_version = endian.read_i32_bytes(data[12..16].try_into().unwrap());
 
+            let hash = md5::compute(&data[16..(filename_data_len as usize + 16)]);
+            let hash = match endian {
+                Endianness::Little => u128::from_le_bytes(hash.0),
+                _ => u128::from_be_bytes(hash.0),
+            };
+
             //let bytes = &data[16..(16 + filename_data_len as usize)];
             let bytes = &data[16..];
-            let (bytes, file_count) = parse_leb128(bytes).unwrap();
-            let mut bytes = bytes;
-            for _ in 0..file_count {
-                let (by, string) = parse_string_ref(bytes).unwrap();
-                bytes = by;
-                file_strings.push(string.trim().to_string());
-            }
+            let (bytes, file_strings) = parse_string_list(bytes).unwrap();
+            result.insert(hash, file_strings);
             let read_len = data_len - bytes.len();
             let padding = if !bytes.is_empty() && (read_len & 0x07) != 0 {
                 8 - (read_len & 0x07)
             } else {
                 0
             };
+            if padding > bytes.len() {
+                break;
+            }
             data = &bytes[padding..];
         }
-        Ok(file_strings)
+        Ok(result)
     } else {
         Err(SectionReadError::EmptySection(LlvmSection::CoverageMap))
     }
@@ -180,24 +185,26 @@ fn parse_coverage_functions<'data, 'file>(
             }
 
             let (data, regions) = parse_mapping_regions(bytes, &filename_indices).unwrap();
-            bytes = data;
 
+            if func_hash != 0 {
+                res.push(FunctionRecordV3 { header, regions });
+            }
+
+            bytes = data;
             let function_len = section_len - bytes.len(); // this should match header
 
-            let padding = if function_len < section_len && (function_len & 0x07) != 0 {
+            let mut padding = if function_len < section_len && (function_len & 0x07) != 0 {
                 8 - (function_len & 0x07)
             } else {
                 0
             };
+
+            if padding > bytes.len() {
+                break;
+            }
             // Now apply padding, and if hash is 0 move on as it's a dummy otherwise add to result
             // And decide what end type will be
             bytes = &bytes[padding..];
-
-            if func_hash == 0 {
-                continue;
-            }
-
-            res.push(FunctionRecordV3 { header, regions });
         }
         Ok(res)
     } else {
