@@ -86,7 +86,7 @@ fn check_command(ext: &OsStr) {
         // llvm comes with by default. So first we check if it works and if so we test
         let llvm = Command::new("cargo")
             .current_dir(&data)
-            .args(&["profdata", "--", "show", "--all-functions"])
+            .args(&["profdata", "--", "show", "--all-functions", "--counts"])
             .arg(raw_file.file_name())
             .output()
             .expect("cargo binutils or llvm-profdata is not installed");
@@ -97,7 +97,7 @@ fn check_command(ext: &OsStr) {
             let rust = assert_cmd::Command::cargo_bin("profparser")
                 .unwrap()
                 .current_dir(&data)
-                .args(&["show", "--all-functions", "-i"])
+                .args(&["show", "--all-functions", "--counts", "-i"])
                 .arg(raw_file.file_name())
                 .output()
                 .expect("Failed to run profparser on file");
@@ -122,7 +122,14 @@ fn check_against_text(ext: &OsStr) {
     {
         let llvm = Command::new("cargo")
             .current_dir(&data)
-            .args(&["profdata", "--", "show", "--text", "--all-functions"])
+            .args(&[
+                "profdata",
+                "--",
+                "show",
+                "--text",
+                "--all-functions",
+                "--counts",
+            ])
             .arg(raw_file.file_name())
             .output()
             .expect("cargo binutils or llvm-profdata is not installed");

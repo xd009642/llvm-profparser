@@ -263,7 +263,7 @@ impl ShowCommand {
                         .skip(start)
                         .map(|x| x.to_string())
                         .collect::<Vec<String>>()
-                        .join(",");
+                        .join(", ");
                     println!("    Block counts: [{}]", counts);
                 }
                 if self.ic_targets {
