@@ -122,7 +122,14 @@ fn check_against_text(ext: &OsStr) {
     {
         let llvm = Command::new("cargo")
             .current_dir(&data)
-            .args(&["profdata", "--", "show", "--text", "--all-functions", "--counts"])
+            .args(&[
+                "profdata",
+                "--",
+                "show",
+                "--text",
+                "--all-functions",
+                "--counts",
+            ])
             .arg(raw_file.file_name())
             .output()
             .expect("cargo binutils or llvm-profdata is not installed");
