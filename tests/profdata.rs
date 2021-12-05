@@ -8,23 +8,23 @@ use std::process::Command;
 
 #[cfg(llvm_11)]
 fn get_data_dir() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/llvm-11")
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/profdata/llvm-11")
 }
 
 #[cfg(llvm_12)]
 fn get_data_dir() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/llvm-12")
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/profdata/llvm-12")
 }
 
 #[cfg(llvm_13)]
 fn get_data_dir() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/llvm-13")
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/profdata/llvm-13")
 }
 
 #[cfg(not(any(llvm_11, llvm_12, llvm_13)))]
 fn get_data_dir() -> PathBuf {
     // Nothing to do so lets get a directory with nothing in
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data")
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/profdata")
 }
 
 fn get_printout(output: &[u8]) -> Vec<String> {
