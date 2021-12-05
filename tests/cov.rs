@@ -6,7 +6,6 @@ use std::fs::read_dir;
 use std::path::PathBuf;
 use std::process::Command;
 
-
 #[cfg(llvm_11)]
 fn get_data_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/cov/llvm-11")
