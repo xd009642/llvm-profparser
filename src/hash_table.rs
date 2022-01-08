@@ -31,6 +31,7 @@ fn read_value(
 ) -> IResult<&[u8], (u64, InstrProfRecord)> {
     if data_len % 8 != 0 {
         // Element is corrupted, it should be aligned
+        todo!();
     }
     let mut result = vec![];
     let end_len = input.len() - data_len;

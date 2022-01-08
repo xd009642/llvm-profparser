@@ -134,7 +134,6 @@ impl InstrProfReader for IndexedInstrProf {
         };
         let mut profile = InstrumentationProfile::default();
         profile.version = Some(header.version);
-        println!("Version: {}", header.version);
         profile.has_csir = header.is_csir_prof();
         profile.is_ir = header.is_ir_prof();
 
