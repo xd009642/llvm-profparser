@@ -43,13 +43,13 @@ fn read_value(
         let mut counts = vec![];
         let (bytes, hash) = le_u64(input)?;
         last_hash = hash;
-        if bytes.len() >= end_len {
+        if bytes.len() <= end_len {
             break;
         }
         // This is only available for versions > v1. But as rust won't be going backwards to legacy
         // versions it's a safe assumption.
         let (bytes, counts_len) = le_u64(bytes)?;
-        if bytes.len() >= end_len {
+        if bytes.len() <= end_len {
             break;
         }
         input = bytes;
@@ -58,18 +58,20 @@ fn read_value(
             input = bytes;
             counts.push(count);
         }
-        if input.len() >= end_len {
+        if input.len() <= end_len {
             break;
         }
 
         // If the version is > v2 then there can also be value profiling data so lets try and parse
         // that now
         let (bytes, total_size) = le_u32(input)?;
-        if bytes.len() >= end_len {
+        if bytes.len() <= end_len {
             break;
         }
         let (bytes, num_value_kinds) = le_u32(bytes)?;
-        if bytes.len() >= end_len {
+        // Here it's just less than because we don't need to read anything else so if it's equal to
+        // we're good
+        if bytes.len() < end_len {
             break;
         }
         input = bytes;
