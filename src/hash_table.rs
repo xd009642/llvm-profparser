@@ -1,4 +1,5 @@
 use crate::instrumentation_profile::types::*;
+use indexmap::IndexMap;
 use nom::{number::complete::*, IResult};
 use std::borrow::Cow;
 use std::collections::HashMap;
@@ -10,7 +11,7 @@ struct KeyDataLen {
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct HashTable(pub HashMap<(u64, String), InstrProfRecord>);
+pub(crate) struct HashTable(pub IndexMap<(u64, String), InstrProfRecord>);
 
 fn read_key_data_len(input: &[u8]) -> IResult<&[u8], KeyDataLen> {
     let (bytes, key_len) = le_u64(input)?;
@@ -96,7 +97,7 @@ fn read_value(
 
 impl HashTable {
     fn new() -> Self {
-        Self(HashMap::new())
+        Self(IndexMap::new())
     }
 
     /// buckets is the data the hash table buckets start at - the start of the `HashTable` in memory.
