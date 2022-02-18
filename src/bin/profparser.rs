@@ -233,7 +233,12 @@ impl ShowCommand {
                 println!("    Hash: {:#018x}", func.hash.unwrap());
                 println!("    Counters: {}", func.counts().len());
                 if !is_ir_instr {
-                    println!("    Function count: {}", func.counts()[0]);
+                    let counts = if func.counts().is_empty() {
+                        0
+                    } else {
+                        func.counts()[0]
+                    };
+                    println!("    Function count: {}", counts);
                 }
                 if self.ic_targets {
                     println!(

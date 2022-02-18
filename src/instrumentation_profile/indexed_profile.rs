@@ -139,6 +139,7 @@ impl InstrProfReader for IndexedInstrProf {
 
         let table_start = input.len() - bytes.len();
         let (bytes, table) = HashTable::parse(
+            header.version,
             bytes,
             table_start,
             header.hash_offset as usize - table_start,

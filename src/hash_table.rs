@@ -1,4 +1,5 @@
 use crate::instrumentation_profile::types::*;
+use indexmap::IndexMap;
 use nom::{number::complete::*, IResult};
 use std::borrow::Cow;
 use std::collections::HashMap;
@@ -10,7 +11,7 @@ struct KeyDataLen {
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct HashTable(pub HashMap<(u64, String), InstrProfRecord>);
+pub(crate) struct HashTable(pub IndexMap<(u64, String), InstrProfRecord>);
 
 fn read_key_data_len(input: &[u8]) -> IResult<&[u8], KeyDataLen> {
     let (bytes, key_len) = le_u64(input)?;
@@ -24,62 +25,97 @@ fn read_key(input: &[u8], key_len: usize) -> IResult<&[u8], Cow<'_, str>> {
     Ok((&input[key_len..], res))
 }
 
-fn read_value(mut input: &[u8], data_len: usize) -> IResult<&[u8], (u64, InstrProfRecord)> {
+fn read_value(
+    version: u64,
+    mut input: &[u8],
+    data_len: usize,
+) -> IResult<&[u8], (u64, InstrProfRecord)> {
     if data_len % 8 != 0 {
         // Element is corrupted, it should be aligned
+        todo!();
     }
     let mut result = vec![];
     let end_len = input.len() - data_len;
 
+    let expected_end = &input[data_len..];
+    let mut last_hash = 0;
+
     while input.len() > end_len {
         let mut counts = vec![];
         let (bytes, hash) = le_u64(input)?;
+        last_hash = hash;
+        if bytes.len() <= end_len {
+            break;
+        }
         // This is only available for versions > v1. But as rust won't be going backwards to legacy
         // versions it's a safe assumption.
         let (bytes, counts_len) = le_u64(bytes)?;
+        if bytes.len() <= end_len {
+            break;
+        }
         input = bytes;
         for _ in 0..counts_len {
             let (bytes, count) = le_u64(input)?;
             input = bytes;
             counts.push(count);
         }
+        result.push((hash, InstrProfRecord { counts, data: None }));
+        if input.len() <= end_len {
+            break;
+        }
 
         // If the version is > v2 then there can also be value profiling data so lets try and parse
         // that now
         let (bytes, total_size) = le_u32(input)?;
+        if bytes.len() <= end_len {
+            break;
+        }
         let (bytes, num_value_kinds) = le_u32(bytes)?;
+        // Here it's just less than because we don't need to read anything else so if it's equal to
+        // we're good
+        if bytes.len() < end_len {
+            break;
+        }
         input = bytes;
         let value_prof_data = ValueProfData {
             total_size,
             num_value_kinds,
         };
-        let data = if value_prof_data.num_value_kinds > 0 {
-            todo!()
-        } else {
-            None
-        };
-        result.push((hash, InstrProfRecord { counts, data }));
+        if value_prof_data.num_value_kinds > 0 && version > 2 {
+            // If we actually want to change data in future get result.last_mut() and change it
+            // there
+            break;
+        }
     }
+    if result.is_empty() {
+        result.push((last_hash, InstrProfRecord::default()));
+    }
+    input = expected_end;
     assert_eq!(result.len(), 1);
     Ok((input, result.remove(0)))
 }
 
 impl HashTable {
     fn new() -> Self {
-        Self(HashMap::new())
+        Self(IndexMap::new())
     }
 
     /// buckets is the data the hash table buckets start at - the start of the `HashTable` in memory.
     /// hash. offset shows the offset from the base address to the start of the `HashTable` as this
     /// will be used to correct any offsets
-    pub(crate) fn parse(input: &[u8], offset: usize, bucket_start: usize) -> IResult<&[u8], Self> {
+    pub(crate) fn parse(
+        version: u64,
+        input: &[u8],
+        offset: usize,
+        bucket_start: usize,
+    ) -> IResult<&[u8], Self> {
         assert!(bucket_start > 0);
         let (bytes, _num_buckets) = le_u64(&input[bucket_start..])?;
         let (bytes, mut num_entries) = le_u64(bytes)?;
         let mut payload = input;
         let mut result = Self::new();
         while num_entries > 0 {
-            let (bytes, entries) = result.parse_bucket(payload, num_entries)?;
+            let (bytes, entries) = result.parse_bucket(version, payload, num_entries)?;
             payload = bytes;
             num_entries = entries;
         }
@@ -88,6 +124,7 @@ impl HashTable {
 
     fn parse_bucket<'a>(
         &mut self,
+        version: u64,
         input: &'a [u8],
         mut num_entries: u64,
     ) -> IResult<&'a [u8], u64> {
@@ -97,11 +134,12 @@ impl HashTable {
             let (bytes, _hash) = le_u64(remaining)?;
             let (bytes, lens) = read_key_data_len(bytes)?;
             let (bytes, key) = read_key(bytes, lens.key_len as usize)?;
-            let (bytes, (hash, value)) = read_value(bytes, lens.data_len as usize)?;
+            let (bytes, (hash, value)) = read_value(version, bytes, lens.data_len as usize)?;
             self.0.insert((hash, key.to_string()), value);
-            remaining = bytes;
             assert!(num_entries > 0);
             num_entries -= 1;
+
+            remaining = bytes;
         }
         Ok((remaining, num_entries))
     }
