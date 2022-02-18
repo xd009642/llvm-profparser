@@ -59,6 +59,7 @@ fn read_value(
             input = bytes;
             counts.push(count);
         }
+        result.push((hash, InstrProfRecord { counts, data: None }));
         if input.len() <= end_len {
             break;
         }
@@ -80,12 +81,11 @@ fn read_value(
             total_size,
             num_value_kinds,
         };
-        let data = if value_prof_data.num_value_kinds > 0 && version > 2 {
+        if value_prof_data.num_value_kinds > 0 && version > 2 {
+            // If we actually want to change data in future get result.last_mut() and change it
+            // there
             break;
-        } else {
-            None
-        };
-        result.push((hash, InstrProfRecord { counts, data }));
+        }
     }
     if result.is_empty() {
         result.push((last_hash, InstrProfRecord::default()));

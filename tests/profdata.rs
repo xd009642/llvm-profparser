@@ -65,7 +65,7 @@ fn check_merge_command(files: &[PathBuf], id: &str) {
         let llvm_records = llvm_merged.records.iter().collect::<HashSet<_>>();
         let rust_records = rust_merged.records.iter().collect::<HashSet<_>>();
         assert!(!llvm_records.is_empty());
-        assert_eq!(llvm_records, rust_records);
+        std::assert_eq!(llvm_records, rust_records);
     } else {
         println!("Unsupported LLVM version");
     }
