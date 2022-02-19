@@ -2,7 +2,8 @@ use crate::instrumentation_profile::types::*;
 use crate::instrumentation_profile::InstrProfReader;
 use nom::branch::alt;
 use nom::bytes::complete::{tag, tag_no_case, take_until, take_while1};
-use nom::character::{complete::one_of, is_digit};
+use nom::character::{complete::one_of, is_digit, is_hex_digit};
+use nom::combinator::eof;
 use nom::error::{Error, ErrorKind};
 use nom::multi::*;
 use nom::sequence::*;
@@ -43,6 +44,16 @@ fn str_to_digit(bytes: &[u8]) -> u64 {
         .unwrap_or_default()
 }
 
+fn read_hexadecimal(input: &[u8]) -> IResult<&[u8], u64> {
+    preceded(alt((tag(b"0x"), tag(b"0X"))), take_while1(is_hex_digit))(input).map(|(b, v)| unsafe {
+        // We know this is okay because it's just the bytes that pass `is_hex_digit`
+        (
+            b,
+            u64::from_str_radix(std::str::from_utf8_unchecked(v), 16).unwrap(),
+        )
+    })
+}
+
 fn valid_name_char(character: u8) -> bool {
     let c = character as char;
     // Whitespace is allowed!
@@ -79,8 +90,12 @@ fn read_line(s: &[u8]) -> IResult<&[u8], &[u8]> {
     tuple((take_while1(valid_name_char), tag(b"\n")))(s).map(|(b, (v, _))| (b, v))
 }
 
+fn read_decimal(s: &[u8]) -> IResult<&[u8], u64> {
+    tuple((take_while1(is_digit), alt((tag(b"\n"), eof))))(s).map(|(b, v)| (b, str_to_digit(v.0)))
+}
+
 fn read_digit(s: &[u8]) -> IResult<&[u8], u64> {
-    tuple((take_while1(is_digit), tag(b"\n")))(s).map(|(b, v)| (b, str_to_digit(v.0)))
+    alt((read_decimal, read_hexadecimal))(s)
 }
 
 fn indirect_value_site(s: &[u8]) -> IResult<&[u8], (&[u8], u64)> {
@@ -330,5 +345,23 @@ mod tests {
         let comment = b"# I am a comment\n";
         let (bytes, _) = strip_comments(comment).unwrap();
         assert_eq!(bytes.len(), 0);
+    }
+
+    #[test]
+    fn simple_hex_parse() {
+        let simple = "main\n0x0\n1\n100";
+        let (buf, report) = TextInstrProf::parse_bytes(simple.as_bytes()).unwrap();
+
+        assert_eq!(report.get_level(), InstrumentationLevel::FrontEnd);
+        assert_eq!(report.records.len(), 1);
+        assert_eq!(report.symtab.len(), 1);
+        assert_eq!(report.symtab.names.get(&0).unwrap(), "main");
+
+        let rec = &report.records[0];
+
+        assert_eq!(rec.name, Some("main".to_string()));
+        assert_eq!(rec.hash, Some(0));
+        assert_eq!(rec.record.counts, vec![100]);
+        assert_eq!(rec.record.data, None);
     }
 }
