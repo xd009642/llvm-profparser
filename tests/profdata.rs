@@ -21,7 +21,12 @@ fn get_data_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/profdata/llvm-13")
 }
 
-#[cfg(not(any(llvm_11, llvm_12, llvm_13)))]
+#[cfg(llvm_14)]
+fn get_data_dir() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/profdata/llvm-14")
+}
+
+#[cfg(not(any(llvm_11, llvm_12, llvm_13, llvm_14)))]
 fn get_data_dir() -> PathBuf {
     // Nothing to do so lets get a directory with nothing in
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/profdata")
