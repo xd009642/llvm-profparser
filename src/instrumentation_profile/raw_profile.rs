@@ -158,10 +158,12 @@ where
         let max_counters = header.max_counters_len();
         let counter_offset = (data.counter_ptr.into() as i64 - header.counters_delta as i64)
             / size_of::<u64>() as i64;
+        // From LLVM coverage mapping version 8 relative counter offsets are allowed which can be
+        // signed
         if data.num_counters == 0
             || max_counters < 0
             || data.num_counters as i64 > max_counters
-            || counter_offset < 0
+            || (header.version < 8 && counter_offset < 0)
             || counter_offset > max_counters
             || counter_offset + data.num_counters as i64 > max_counters
         {
@@ -211,9 +213,14 @@ where
             let mut result = InstrumentationProfile::default();
             let (bytes, header) = Self::parse_header(input)?;
             // LLVM 11 and 12 are version 5. LLVM 13 is version 7
-            result.version = Some(header.version & !VARIANT_MASKS_ALL);
+            let version_num = header.version & !VARIANT_MASKS_ALL;
+            result.version = Some(version_num);
             result.is_ir = (header.version & VARIANT_MASK_IR_PROF) != 0;
             result.has_csir = (header.version & VARIANT_MASK_CSIR_PROF) != 0;
+            if version_num > 7 {
+                result.is_byte_coverage = (header.version & VARIANT_MASK_BYTE_COVERAGE) != 0;
+                result.fn_entry_only = (header.version & VARIANT_MASK_FUNCTION_ENTRY_ONLY) != 0;
+            }
             input = &bytes[(header.binary_ids_len as usize)..];
             let mut data_section = vec![];
             for _ in 0..header.data_len {
@@ -269,9 +276,10 @@ where
         if Self::has_format(input) {
             let endianness = file_endianness::<T>(&input[..8].try_into().unwrap());
             let (bytes, version) = nom_u64(endianness)(&input[8..])?;
-            let (bytes, binary_ids_len) = match version & !VARIANT_MASKS_ALL {
-                7 => nom_u64(endianness)(&bytes[..])?,
-                _ => (bytes, 0),
+            let (bytes, binary_ids_len) = if (version & !VARIANT_MASKS_ALL) >= 7 {
+                nom_u64(endianness)(&bytes[..])?
+            } else {
+                (bytes, 0)
             };
             let (bytes, data_len) = nom_u64(endianness)(&bytes[..])?;
             let (bytes, padding_bytes_before_counters) = nom_u64(endianness)(&bytes[..])?;
