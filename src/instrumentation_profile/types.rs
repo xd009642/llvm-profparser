@@ -9,6 +9,10 @@ pub(crate) const VARIANT_MASKS_ALL: u64 = 0xff00_0000_0000_0000;
 pub(crate) const VARIANT_MASK_IR_PROF: u64 = 1u64 << 56;
 /// This is taken from `llvm/include/llvm/ProfileData/InstrProfileData.inc`
 pub(crate) const VARIANT_MASK_CSIR_PROF: u64 = 1u64 << 57;
+/// This is taken from `llvm/include/llvm/ProfileData/InstrProfileData.inc`
+pub(crate) const VARIANT_MASK_BYTE_COVERAGE: u64 = 1u64 << 60;
+/// This is taken from `llvm/include/llvm/ProfileData/InstrProfileData.inc`
+pub(crate) const VARIANT_MASK_FUNCTION_ENTRY_ONLY: u64 = 1u64 << 61;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Ord, PartialOrd, Hash)]
 pub enum ValueKind {
@@ -68,6 +72,8 @@ pub struct InstrumentationProfile {
     pub(crate) has_csir: bool,
     pub(crate) is_ir: bool,
     pub(crate) is_entry_first: bool,
+    pub(crate) is_byte_coverage: bool,
+    pub(crate) fn_entry_only: bool,
     pub records: Vec<NamedInstrProfRecord>,
     pub symtab: Symtab,
 }
@@ -75,6 +81,10 @@ pub struct InstrumentationProfile {
 impl InstrumentationProfile {
     pub fn version(&self) -> Option<u64> {
         self.version
+    }
+
+    pub fn version_unchecked(&self) -> u64 {
+        *self.version.as_ref().unwrap()
     }
 
     pub fn is_ir_level_profile(&self) -> bool {
@@ -95,6 +105,17 @@ impl InstrumentationProfile {
         } else {
             InstrumentationLevel::FrontEnd
         }
+    }
+
+    /// Byte coverage switches things around to make `0` equivalent to coverage and !0 uncovered it
+    /// seems. This currently is not supported but also not output by any rust tools (to my
+    /// knowledge)
+    pub fn is_byte_coverage(&self) -> bool {
+        self.is_byte_coverage
+    }
+
+    pub fn fn_entry_only(&self) -> bool {
+        self.fn_entry_only
     }
 
     pub fn merge(&mut self, other: &Self) {
