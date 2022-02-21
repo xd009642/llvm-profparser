@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use std::convert::TryFrom;
 
 pub mod coverage_mapping;
+pub mod reporting;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct CoverageMappingInfo {

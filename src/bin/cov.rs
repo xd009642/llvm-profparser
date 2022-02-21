@@ -26,6 +26,8 @@ pub struct ShowCommand {
     /// Coverage executable or object file
     #[structopt(long = "object")]
     objects: Vec<PathBuf>,
+    #[structopt(long = "path-equivalence")]
+    path_remapping: PathRemapping,
 }
 
 impl ShowCommand {
@@ -38,6 +40,8 @@ impl ShowCommand {
             panic!("Must provide an instrumentation profile");
         };
         let mapping = CoverageMapping::new(&self.objects, &instr_prof);
+        println!("Profile: {:?}", instr_prof);
+        println!("Mapping: {:?}", mapping);
         todo!();
     }
 }

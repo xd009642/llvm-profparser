@@ -9,6 +9,7 @@ pub mod util;
 
 pub use crate::instrumentation_profile::{parse, parse_bytes};
 pub use coverage::coverage_mapping::CoverageMapping;
+pub use coverage::reporting::*;
 pub use coverage::*;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Ord, PartialOrd)]
