@@ -28,6 +28,12 @@ pub enum CounterKind {
     Expression,
 }
 
+impl Default for CounterKind {
+    fn default() -> Self {
+        Self::Zero
+    }
+}
+
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub enum ExprKind {
     Add,
@@ -47,6 +53,9 @@ pub enum RegionKind {
     /// A Gap Region is like a Code Region but its count is only set as the line execution count
     /// when its the only region in the line
     Gap = 3,
+    /// A Branch Region represents lead-level boolean exprssions and is associated with two
+    /// counters, each representing the number of times the expression evaluates to true or false.
+    Branch = 4,
 }
 
 impl TryFrom<u64> for RegionKind {
@@ -58,6 +67,7 @@ impl TryFrom<u64> for RegionKind {
             1 => Ok(RegionKind::Expansion),
             2 => Ok(RegionKind::Skipped),
             3 => Ok(RegionKind::Gap),
+            4 => Ok(RegionKind::Branch),
             e => Err(e),
         }
     }
@@ -69,6 +79,12 @@ pub enum CounterType {
     ProfileInstrumentation,
     SubtractionExpr,
     AdditionExpr,
+}
+
+impl Default for CounterType {
+    fn default() -> Self {
+        Self::Zero
+    }
 }
 
 pub(crate) fn parse_counter(input: u64) -> Counter {
@@ -84,12 +100,13 @@ pub(crate) fn parse_counter(input: u64) -> Counter {
     Counter { kind, id }
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Ord, PartialOrd)]
+#[derive(Debug, Default, Clone, Copy, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub struct Counter {
     pub kind: CounterType,
     id: u64,
 }
 
+/// Is this equivalent to CounterExpression? Where's the ExprKind?
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub struct Expression {
     lhs: Counter,
@@ -107,7 +124,10 @@ impl Counter {
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct CounterMappingRegion {
     kind: RegionKind,
+    /// Primary counter that is also used for true branches
     count: Counter,
+    /// Secondary counter that is also used for false branches
+    false_count: Counter,
     file_id: usize,
     expanded_file_id: usize,
     line_start: usize,
@@ -138,4 +158,12 @@ pub struct FunctionRecordHeader {
 pub struct FunctionRecordV3 {
     header: FunctionRecordHeader,
     regions: Vec<CounterMappingRegion>,
+}
+
+pub struct CoverageMappingRecord {
+    fn_name: String,
+    fn_hash: u64,
+    file_names: Vec<String>,
+    expressions: Vec<Expression>,
+    mapping_regions: Vec<CounterMappingRegion>,
 }

@@ -26,6 +26,8 @@ pub struct ShowCommand {
     /// Coverage executable or object file
     #[structopt(long = "object")]
     objects: Vec<PathBuf>,
+    /// Pair of paths for a remapping to allow loading files after move. Comma separated in the
+    /// order `source,dest`
     #[structopt(long = "path-equivalence")]
     path_remapping: PathRemapping,
 }

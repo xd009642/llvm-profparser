@@ -9,6 +9,12 @@ use std::fmt;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+/// So what the LLVM one has that this one doesn't yet:
+/// 1. DenseMap<size_t, DenseSet<size_t>> RecordProvenance
+/// 2. std::vector<FunctionRecord> functions (this is probably taken straight from
+/// InstrumentationProfile
+/// 3. DenseMap<size_t, SmallVector<unsigned, 0>> FilenameHash2RecordIndices
+/// 4. Vec<Pair<String, u64>> FuncHashMismatches
 #[derive(Debug)]
 pub struct CoverageMapping<'a> {
     profile: &'a InstrumentationProfile,
@@ -214,6 +220,7 @@ fn parse_coverage_functions<'data, 'file>(
     }
 }
 
+/// This code is ported from RawCoverageMappingReader::readMappingRegionsSubArray
 fn parse_mapping_regions<'a>(
     mut bytes: &'a [u8],
     file_indices: &[u64],
@@ -224,15 +231,12 @@ fn parse_mapping_regions<'a>(
         bytes = data;
         let mut last_line = 0;
         for _ in 0..regions_len {
+            let mut false_count = Counter::default();
             let mut kind = RegionKind::Code;
             let (data, raw_header) = parse_leb128(bytes)?;
-            let (data, delta_line) = parse_leb128(data)?;
-            let (data, column_start) = parse_leb128(data)?;
-            let (data, lines_len) = parse_leb128(data)?;
-            let (data, column_end) = parse_leb128(data)?;
             bytes = data;
             let mut expanded_file_id = 0;
-            let counter = parse_counter(raw_header);
+            let mut counter = parse_counter(raw_header);
             if counter.kind == CounterType::Zero {
                 if raw_header & Counter::ENCODING_EXPANSION_REGION_BIT > 0 {
                     kind = RegionKind::Expansion;
@@ -244,10 +248,27 @@ fn parse_mapping_regions<'a>(
                     let shifted_counter = raw_header >> Counter::ENCODING_TAG_AND_EXP_REGION_BITS;
                     match shifted_counter.try_into() {
                         Ok(RegionKind::Code) | Ok(RegionKind::Skipped) => {}
+                        Ok(RegionKind::Branch) => {
+                            kind = RegionKind::Branch;
+                            let (data, c1) = parse_leb128(bytes)?;
+                            let (data, c2) = parse_leb128(bytes)?;
+
+                            counter = parse_counter(c1);
+                            false_count = parse_counter(c2);
+                            bytes = data;
+                        }
                         e => panic!("Malformed: {:?}", e),
                     }
                 }
+            } else {
+                panic!("This is a counter decoding error");
             }
+
+            let (data, delta_line) = parse_leb128(bytes)?;
+            let (data, column_start) = parse_leb128(data)?;
+            let (data, lines_len) = parse_leb128(data)?;
+            let (data, column_end) = parse_leb128(data)?;
+            bytes = data;
 
             let (column_start, column_end) = if column_start == 0 && column_end == 0 {
                 (1usize, usize::MAX)
@@ -263,6 +284,7 @@ fn parse_mapping_regions<'a>(
             mapping.push(CounterMappingRegion {
                 kind,
                 count: counter,
+                false_count,
                 file_id: *i as usize,
                 expanded_file_id: expanded_file_id as _,
                 line_start,
