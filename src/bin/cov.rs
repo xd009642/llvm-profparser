@@ -29,7 +29,7 @@ pub struct ShowCommand {
     /// Pair of paths for a remapping to allow loading files after move. Comma separated in the
     /// order `source,dest`
     #[structopt(long = "path-equivalence")]
-    path_remapping: PathRemapping,
+    path_remapping: Option<PathRemapping>,
 }
 
 impl ShowCommand {

@@ -186,14 +186,19 @@ fn parse_coverage_functions<'data, 'file>(
                 let (data, rhs) = parse_leb128(data).unwrap();
                 let lhs = parse_counter(lhs);
                 let rhs = parse_counter(rhs);
-                exprs.push(Expression { lhs, rhs });
+                exprs.push(Expression::new(lhs, rhs));
                 bytes = data;
             }
 
-            let (data, regions) = parse_mapping_regions(bytes, &filename_indices).unwrap();
+            let (data, regions) =
+                parse_mapping_regions(bytes, &filename_indices, &mut exprs).unwrap();
 
             if func_hash != 0 {
-                res.push(FunctionRecordV3 { header, regions });
+                res.push(FunctionRecordV3 {
+                    header,
+                    regions,
+                    expressions: exprs,
+                });
             }
 
             bytes = data;
@@ -224,6 +229,7 @@ fn parse_coverage_functions<'data, 'file>(
 fn parse_mapping_regions<'a>(
     mut bytes: &'a [u8],
     file_indices: &[u64],
+    expressions: &mut Vec<Expression>,
 ) -> IResult<&'a [u8], Vec<CounterMappingRegion>> {
     let mut mapping = vec![];
     for i in file_indices {
@@ -237,6 +243,10 @@ fn parse_mapping_regions<'a>(
             bytes = data;
             let mut expanded_file_id = 0;
             let mut counter = parse_counter(raw_header);
+            if counter.is_expression() {
+                let expr = parse_expression(counter.kind, raw_header);
+                println!("Found: {:?}", expr);
+            }
             if counter.kind == CounterType::Zero {
                 if raw_header & Counter::ENCODING_EXPANSION_REGION_BIT > 0 {
                     kind = RegionKind::Expansion;
@@ -260,8 +270,13 @@ fn parse_mapping_regions<'a>(
                         e => panic!("Malformed: {:?}", e),
                     }
                 }
-            } else {
-                panic!("This is a counter decoding error");
+            } else if counter.is_expression() {
+                // this shouldn' be here
+                expressions[counter.id as usize].set_kind(counter.get_expr_kind());
+                // So because `parse_counter` will panic if an invalid counter is present currently
+                // the error condition that could be hit here "isn't" an issue
+
+                // use expressions here and fill in kinds
             }
 
             let (data, delta_line) = parse_leb128(bytes)?;
@@ -292,6 +307,7 @@ fn parse_mapping_regions<'a>(
                 column_start,
                 column_end,
             });
+            println!("{:?}", mapping[mapping.len() - 1]);
         }
     }
     Ok((bytes, mapping))

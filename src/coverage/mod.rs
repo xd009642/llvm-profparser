@@ -36,8 +36,8 @@ impl Default for CounterKind {
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub enum ExprKind {
-    Add,
     Subtract,
+    Add,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Ord, PartialOrd)]
@@ -53,7 +53,7 @@ pub enum RegionKind {
     /// A Gap Region is like a Code Region but its count is only set as the line execution count
     /// when its the only region in the line
     Gap = 3,
-    /// A Branch Region represents lead-level boolean exprssions and is associated with two
+    /// A Branch Region represents lead-level boolean expressions and is associated with two
     /// counters, each representing the number of times the expression evaluates to true or false.
     Branch = 4,
 }
@@ -87,6 +87,12 @@ impl Default for CounterType {
     }
 }
 
+pub(crate) fn parse_expression(kind: CounterType, input: u64) -> Counter {
+    let id = input >> Counter::ENCODING_TAG_BITS;
+    Counter { kind, id }
+}
+
+// Attempts to simplify RawCoverageMappingReader::decodeCounter
 pub(crate) fn parse_counter(input: u64) -> Counter {
     let ty = (Counter::ENCODING_TAG_MASK & input) as u8;
     let kind = match ty {
@@ -103,14 +109,45 @@ pub(crate) fn parse_counter(input: u64) -> Counter {
 #[derive(Debug, Default, Clone, Copy, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub struct Counter {
     pub kind: CounterType,
-    id: u64,
+    pub id: u64,
+}
+
+impl Counter {
+    pub fn is_expression(&self) -> bool {
+        matches!(
+            self.kind,
+            CounterType::SubtractionExpr | CounterType::AdditionExpr
+        )
+    }
+
+    pub fn get_expr_kind(&self) -> ExprKind {
+        match self.kind {
+            CounterType::Zero | CounterType::SubtractionExpr => ExprKind::Subtract,
+            _ => ExprKind::Add,
+        }
+    }
 }
 
 /// Is this equivalent to CounterExpression? Where's the ExprKind?
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub struct Expression {
+    kind: ExprKind,
     lhs: Counter,
     rhs: Counter,
+}
+
+impl Expression {
+    pub fn new(lhs: Counter, rhs: Counter) -> Self {
+        Self {
+            kind: ExprKind::Subtract,
+            lhs,
+            rhs,
+        }
+    }
+
+    pub fn set_kind(&mut self, kind: ExprKind) {
+        self.kind = kind;
+    }
 }
 
 impl Counter {
@@ -158,6 +195,7 @@ pub struct FunctionRecordHeader {
 pub struct FunctionRecordV3 {
     header: FunctionRecordHeader,
     regions: Vec<CounterMappingRegion>,
+    expressions: Vec<Expression>,
 }
 
 pub struct CoverageMappingRecord {
