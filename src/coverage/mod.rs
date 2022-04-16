@@ -22,19 +22,6 @@ pub struct ProfileData {
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Ord, PartialOrd)]
-pub enum CounterKind {
-    Zero,
-    ValueReference,
-    Expression,
-}
-
-impl Default for CounterKind {
-    fn default() -> Self {
-        Self::Zero
-    }
-}
-
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub enum ExprKind {
     Subtract,
     Add,
@@ -77,8 +64,7 @@ impl TryFrom<u64> for RegionKind {
 pub enum CounterType {
     Zero,
     ProfileInstrumentation,
-    SubtractionExpr,
-    AdditionExpr,
+    Expression(ExprKind),
 }
 
 impl Default for CounterType {
@@ -98,8 +84,8 @@ pub(crate) fn parse_counter(input: u64) -> Counter {
     let kind = match ty {
         0 => CounterType::Zero,
         1 => CounterType::ProfileInstrumentation,
-        2 => CounterType::SubtractionExpr,
-        3 => CounterType::AdditionExpr,
+        2 => CounterType::Expression(ExprKind::Subtract),
+        3 => CounterType::Expression(ExprKind::Add),
         _ => unreachable!(),
     };
     let id = input >> 2; // For zero we don't actually care about this but we'll still do it
@@ -114,16 +100,18 @@ pub struct Counter {
 
 impl Counter {
     pub fn is_expression(&self) -> bool {
-        matches!(
-            self.kind,
-            CounterType::SubtractionExpr | CounterType::AdditionExpr
-        )
+        matches!(self.kind, CounterType::Expression(_))
     }
 
+    /// Gets the kind of the expression
+    ///
+    /// # Panics
+    ///
+    /// Panics if not an kind of `CounterType::Expression`
     pub fn get_expr_kind(&self) -> ExprKind {
         match self.kind {
-            CounterType::Zero | CounterType::SubtractionExpr => ExprKind::Subtract,
-            _ => ExprKind::Add,
+            CounterType::Expression(e) => e,
+            _ => panic!("Counter is not an expression"),
         }
     }
 }
