@@ -179,14 +179,16 @@ fn parse_coverage_functions<'data, 'file>(
                 bytes = data;
             }
             let (data, expr_len) = parse_leb128(bytes).unwrap();
+            let expr_len = expr_len as usize;
             bytes = data;
-            let mut exprs = vec![];
-            for _ in 0..expr_len {
+            let mut exprs = vec![Expression::default(); expr_len];
+            for i in 0..expr_len {
                 let (data, lhs) = parse_leb128(bytes).unwrap();
                 let (data, rhs) = parse_leb128(data).unwrap();
-                let lhs = parse_counter(lhs);
-                let rhs = parse_counter(rhs);
-                exprs.push(Expression::new(lhs, rhs));
+                let lhs = parse_counter(lhs, &mut exprs);
+                let rhs = parse_counter(rhs, &mut exprs);
+                exprs[i].lhs = lhs;
+                exprs[i].rhs = rhs;
                 bytes = data;
             }
 
@@ -225,7 +227,7 @@ fn parse_coverage_functions<'data, 'file>(
     }
 }
 
-/// This code is ported from RawCoverageMappingReader::readMappingRegionsSubArray
+/// This code is ported from `RawCoverageMappingReader::readMappingRegionsSubArray`
 fn parse_mapping_regions<'a>(
     mut bytes: &'a [u8],
     file_indices: &[u64],
@@ -242,7 +244,7 @@ fn parse_mapping_regions<'a>(
             let (data, raw_header) = parse_leb128(bytes)?;
             bytes = data;
             let mut expanded_file_id = 0;
-            let mut counter = parse_counter(raw_header);
+            let mut counter = parse_counter(raw_header, expressions);
             if counter.is_expression() {
                 let expr = parse_expression(counter.kind, raw_header);
                 println!("Found: {:?}", expr);
@@ -263,20 +265,13 @@ fn parse_mapping_regions<'a>(
                             let (data, c1) = parse_leb128(bytes)?;
                             let (data, c2) = parse_leb128(bytes)?;
 
-                            counter = parse_counter(c1);
-                            false_count = parse_counter(c2);
+                            counter = parse_counter(c1, expressions);
+                            false_count = parse_counter(c2, expressions);
                             bytes = data;
                         }
                         e => panic!("Malformed: {:?}", e),
                     }
                 }
-            } else if counter.is_expression() {
-                // this shouldn' be here
-                expressions[counter.id as usize].set_kind(counter.get_expr_kind());
-                // So because `parse_counter` will panic if an invalid counter is present currently
-                // the error condition that could be hit here "isn't" an issue
-
-                // use expressions here and fill in kinds
             }
 
             let (data, delta_line) = parse_leb128(bytes)?;
@@ -380,4 +375,27 @@ fn parse_profile_names<'data, 'file>(
     } else {
         Err(SectionReadError::EmptySection(LlvmSection::ProfileNames))
     }
+}
+
+/// The equivalent llvm function is `RawCoverageMappingReader::decodeCounter`. This makes it
+/// stateless as I don't want to be maintaining an expression vector and clearing it and
+/// repopulating for every function record.
+fn parse_counter(input: u64, exprs: &mut Vec<Expression>) -> Counter {
+    let ty = (Counter::ENCODING_TAG_MASK & input) as u8;
+    let id = input >> 2; // For zero we don't actually care about this but we'll still do it
+    let kind = match ty {
+        0 => CounterType::Zero,
+        1 => CounterType::ProfileInstrumentation,
+        2 | 3 => {
+            let expr_kind = if ty == 2 {
+                ExprKind::Subtract
+            } else {
+                ExprKind::Add
+            };
+            exprs[id as usize].set_kind(expr_kind);
+            CounterType::Expression(expr_kind)
+        }
+        _ => unreachable!(),
+    };
+    Counter { kind, id }
 }

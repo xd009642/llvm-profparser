@@ -2,7 +2,6 @@ use crate::instrumentation_profile::types::*;
 use indexmap::IndexMap;
 use nom::{number::complete::*, IResult};
 use std::borrow::Cow;
-use std::collections::HashMap;
 
 #[derive(Copy, Clone, Debug)]
 struct KeyDataLen {

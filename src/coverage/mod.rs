@@ -21,12 +21,18 @@ pub struct ProfileData {
     counters_len: u32,
 }
 
+/// This is the type of a counter expression. The equivalent type in llvm would be
+/// `CounterExpression::ExprKind` an inner enum.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub enum ExprKind {
+    /// Subtracts a counter from another
     Subtract,
+    /// Adds a counter to another
     Add,
 }
 
+/// Defines what type of region a counter maps to. The equivalent type in llvm would be
+/// `CounterMappingRegion::RegionKind`.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub enum RegionKind {
     /// A Code Region associates some code with a counter
@@ -60,6 +66,7 @@ impl TryFrom<u64> for RegionKind {
     }
 }
 
+/// Represents the type of a counter. The equivalent type in llvm would be `Counter::CounterKind`.
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum CounterType {
     Zero,
@@ -78,20 +85,8 @@ pub(crate) fn parse_expression(kind: CounterType, input: u64) -> Counter {
     Counter { kind, id }
 }
 
-// Attempts to simplify RawCoverageMappingReader::decodeCounter
-pub(crate) fn parse_counter(input: u64) -> Counter {
-    let ty = (Counter::ENCODING_TAG_MASK & input) as u8;
-    let kind = match ty {
-        0 => CounterType::Zero,
-        1 => CounterType::ProfileInstrumentation,
-        2 => CounterType::Expression(ExprKind::Subtract),
-        3 => CounterType::Expression(ExprKind::Add),
-        _ => unreachable!(),
-    };
-    let id = input >> 2; // For zero we don't actually care about this but we'll still do it
-    Counter { kind, id }
-}
-
+/// A `Counter` is an abstract value that describes how to compute the execution count for a region
+/// of code using the collected profile count data. The equivalent type in llvm would be `Counter`.
 #[derive(Debug, Default, Clone, Copy, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub struct Counter {
     pub kind: CounterType,
@@ -116,12 +111,19 @@ impl Counter {
     }
 }
 
-/// Is this equivalent to CounterExpression? Where's the ExprKind?
+/// A counter expression is a value that represents an arithmetic operation between two counters.
+/// The equivalent llvm type would be `CounterExpression`.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub struct Expression {
-    kind: ExprKind,
-    lhs: Counter,
-    rhs: Counter,
+    pub kind: ExprKind,
+    pub lhs: Counter,
+    pub rhs: Counter,
+}
+
+impl Default for Expression {
+    fn default() -> Self {
+        Expression::new(Counter::default(), Counter::default())
+    }
 }
 
 impl Expression {
@@ -145,7 +147,8 @@ impl Counter {
     const ENCODING_EXPANSION_REGION_BIT: u64 = 4;
 }
 
-/// Associates a source code reader with a specific counter
+/// Associates a source code reader with a specific counter. The equivalent type in llvm would be
+/// `CounterMappingRegion`.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct CounterMappingRegion {
     kind: RegionKind,
@@ -161,13 +164,22 @@ pub struct CounterMappingRegion {
     column_end: usize,
 }
 
+/// The execution count information starting at a point in a file. A sequence of execution counters
+/// for a file in a format hat's simple to iterate over for processing. The equivalent llvm type is
+/// `CoverageSegment`.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub struct CoverageSegment {
+    /// The line the segment begins
     line: usize,
+    /// The column the segment begins
     col: usize,
+    /// The execution count, or zero if not executed
     count: usize,
+    /// When false the segment is not instrumented or skipped
     has_count: bool,
+    /// whether this enters a new region or returns to a previous count
     is_region_entry: usize,
+    /// Whether this enters a gap region
     is_gap_region: usize,
 }
 
@@ -186,6 +198,8 @@ pub struct FunctionRecordV3 {
     expressions: Vec<Expression>,
 }
 
+/// Coverage mapping information for a single function. The equivalent llvm type is
+/// `CoverageMappingRecord`.
 pub struct CoverageMappingRecord {
     fn_name: String,
     fn_hash: u64,
