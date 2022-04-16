@@ -91,7 +91,7 @@ pub struct MergeCommand {
     output: PathBuf,
     /// List of weights and filenames in `<weight>,<filename>` format
     #[structopt(long = "weighted-input", parse(try_from_str=try_parse_weighted))]
-    weighted_input: Vec<(u64, PathBuf)>,
+    weighted_input: Vec<(u64, String)>,
     /// Number of merge threads to use (will autodetect by default)
     #[structopt(long = "num-threads", short = "j")]
     jobs: Option<usize>,
@@ -126,8 +126,22 @@ pub struct Opts {
     cmd: Command,
 }
 
-fn try_parse_weighted(input: &str) -> Result<(u64, PathBuf), String> {
-    todo!()
+fn try_parse_weighted(input: &str) -> Result<(u64, String), String> {
+    if !input.contains(',') {
+        Ok((1, input.to_string())) 
+    } else {
+        let parts = input.split(',').collect::<Vec<_>>();
+        if parts.len() != 2 {
+            Err(format!("Unexpected weighting format, expected $weight,$name or just $name"))
+        } else {
+            let weight = parts[0].parse().map_err(|e| format!("Invalid weight: {}", e))?;
+            if weight < 1 {
+                Err(format!("Weight must be positive integer"))
+            } else {
+                Ok((weight, parts[1].to_string()))
+            }
+        }
+    }
 }
 
 fn check_function(name: Option<&String>, pattern: Option<&String>) -> bool {

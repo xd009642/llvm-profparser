@@ -105,12 +105,12 @@ impl HashTable {
     pub(crate) fn parse(
         version: u64,
         input: &[u8],
-        offset: usize,
+        _offset: usize,
         bucket_start: usize,
     ) -> IResult<&[u8], Self> {
         assert!(bucket_start > 0);
         let (bytes, _num_buckets) = le_u64(&input[bucket_start..])?;
-        let (bytes, mut num_entries) = le_u64(bytes)?;
+        let (_bytes, mut num_entries) = le_u64(bytes)?;
         let mut payload = input;
         let mut result = Self::new();
         while num_entries > 0 {

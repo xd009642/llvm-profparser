@@ -245,10 +245,6 @@ fn parse_mapping_regions<'a>(
             bytes = data;
             let mut expanded_file_id = 0;
             let mut counter = parse_counter(raw_header, expressions);
-            if counter.is_expression() {
-                let expr = parse_expression(counter.kind, raw_header);
-                println!("Found: {:?}", expr);
-            }
             if counter.kind == CounterType::Zero {
                 if raw_header & Counter::ENCODING_EXPANSION_REGION_BIT > 0 {
                     kind = RegionKind::Expansion;
@@ -302,7 +298,6 @@ fn parse_mapping_regions<'a>(
                 column_start,
                 column_end,
             });
-            println!("{:?}", mapping[mapping.len() - 1]);
         }
     }
     Ok((bytes, mapping))
