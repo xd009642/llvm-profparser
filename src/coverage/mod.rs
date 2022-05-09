@@ -89,7 +89,9 @@ pub(crate) fn parse_expression(kind: CounterType, input: u64) -> Counter {
 /// of code using the collected profile count data. The equivalent type in llvm would be `Counter`.
 #[derive(Debug, Default, Clone, Copy, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub struct Counter {
+    /// Type of the counter present
     pub kind: CounterType,
+    /// A valid counter ID, if this counter isn't expected to have an ID then the ID must be zero.
     pub id: u64,
 }
 
@@ -191,6 +193,9 @@ pub struct FunctionRecordHeader {
     filenames_ref: u64,
 }
 
+/// This type contains a header showing which function it refers to and then a list of regions in
+/// that function and a list of expressions. The expression IDs in the counter mapping region refer
+/// to indexes in the expressions list.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub struct FunctionRecordV3 {
     header: FunctionRecordHeader,

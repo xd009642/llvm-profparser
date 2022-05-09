@@ -18,6 +18,7 @@ use std::path::{Path, PathBuf};
 #[derive(Debug)]
 pub struct CoverageMapping<'a> {
     profile: &'a InstrumentationProfile,
+    mapping_info: Vec<CoverageMappingInfo>,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -98,13 +99,16 @@ impl<'a> CoverageMapping<'a> {
         object_files: &[PathBuf],
         profile: &'a InstrumentationProfile,
     ) -> Result<Self, Box<dyn Error>> {
-        let mut mappings = vec![];
+        let mut mapping_info = vec![];
         println!("profile:\n{:#?}", profile);
         for file in object_files {
-            mappings.push(read_object_file(file.as_path())?);
+            mapping_info.push(read_object_file(file.as_path())?);
         }
-        println!("Mappings:\n{:#?}", mappings);
-        todo!("Mapping of coverage profile and counters");
+        println!("Mappings:\n{:#?}", mapping_info);
+        Ok(Self {
+            profile,
+            mapping_info,
+        })
     }
 }
 
