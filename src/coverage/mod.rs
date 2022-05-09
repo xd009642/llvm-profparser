@@ -207,3 +207,27 @@ pub struct CoverageMappingRecord {
     expressions: Vec<Expression>,
     mapping_regions: Vec<CounterMappingRegion>,
 }
+
+/// Associates a source range with a specific counter. The equivalent llvm type is `CountedRegion`.
+pub struct CountedRegion {
+    execution_count: usize,
+    false_execution_count: usize,
+    folded: bool,
+    region: CounterMappingRegion,
+}
+
+/// This is the code coverage information for a single function. It is equivalent to
+/// `FunctionRecord` but has been renamed to avoid confusion with `FunctionRecordV3` etc
+pub struct FunctionCoverageRecord {
+    /// Raw function name
+    name: String,
+    /// This is a list to allow for macro expansions within a function where the macro is defined
+    /// in a different source file
+    filenames: Vec<String>,
+    /// regions in the function with their counts
+    counted_regions: Vec<CountedRegion>,
+    /// Branch regions with their counts
+    counted_branch_regions: Vec<CountedRegion>,
+    /// Number of times the function was executed
+    execution_count: usize,
+}

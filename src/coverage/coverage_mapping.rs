@@ -203,6 +203,11 @@ fn parse_coverage_functions<'data, 'file>(
                 });
             }
 
+            // Todo set couners for expansion regions - counter of expansion region is the counter
+            // of the first region from the expanded file. This requires multiple passes to
+            // correctly propagate across all nested regions. N.B. I haven't seen any expansion
+            // regions in use so may not be an issue!
+
             bytes = data;
             let function_len = section_len - bytes.len(); // this should match header
 

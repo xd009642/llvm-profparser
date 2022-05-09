@@ -128,13 +128,17 @@ pub struct Opts {
 
 fn try_parse_weighted(input: &str) -> Result<(u64, String), String> {
     if !input.contains(',') {
-        Ok((1, input.to_string())) 
+        Ok((1, input.to_string()))
     } else {
         let parts = input.split(',').collect::<Vec<_>>();
         if parts.len() != 2 {
-            Err(format!("Unexpected weighting format, expected $weight,$name or just $name"))
+            Err(format!(
+                "Unexpected weighting format, expected $weight,$name or just $name"
+            ))
         } else {
-            let weight = parts[0].parse().map_err(|e| format!("Invalid weight: {}", e))?;
+            let weight = parts[0]
+                .parse()
+                .map_err(|e| format!("Invalid weight: {}", e))?;
             if weight < 1 {
                 Err(format!("Weight must be positive integer"))
             } else {
