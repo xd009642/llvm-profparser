@@ -7,18 +7,18 @@ pub mod reporting;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct CoverageMappingInfo {
-    cov_map: HashMap<u64, Vec<String>>,
-    cov_fun: Vec<FunctionRecordV3>,
-    prof_names: Vec<String>,
-    prof_counts: Vec<u64>,
-    prof_data: Vec<ProfileData>,
+    pub cov_map: HashMap<u64, Vec<String>>,
+    pub cov_fun: Vec<FunctionRecordV3>,
+    pub prof_names: Vec<String>,
+    pub prof_counts: Vec<u64>,
+    pub prof_data: Vec<ProfileData>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub struct ProfileData {
-    name_md5: u64,
-    structural_hash: u64,
-    counters_len: u32,
+    pub name_md5: u64,
+    pub structural_hash: u64,
+    pub counters_len: u32,
 }
 
 /// This is the type of a counter expression. The equivalent type in llvm would be
@@ -153,17 +153,17 @@ impl Counter {
 /// `CounterMappingRegion`.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct CounterMappingRegion {
-    kind: RegionKind,
+    pub kind: RegionKind,
     /// Primary counter that is also used for true branches
-    count: Counter,
+    pub count: Counter,
     /// Secondary counter that is also used for false branches
-    false_count: Counter,
-    file_id: usize,
-    expanded_file_id: usize,
-    line_start: usize,
-    column_start: usize,
-    line_end: usize,
-    column_end: usize,
+    pub false_count: Counter,
+    pub file_id: usize,
+    pub expanded_file_id: usize,
+    pub line_start: usize,
+    pub column_start: usize,
+    pub line_end: usize,
+    pub column_end: usize,
 }
 
 /// The execution count information starting at a point in a file. A sequence of execution counters
@@ -172,25 +172,25 @@ pub struct CounterMappingRegion {
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub struct CoverageSegment {
     /// The line the segment begins
-    line: usize,
+    pub line: usize,
     /// The column the segment begins
-    col: usize,
+    pub col: usize,
     /// The execution count, or zero if not executed
-    count: usize,
+    pub count: usize,
     /// When false the segment is not instrumented or skipped
-    has_count: bool,
+    pub has_count: bool,
     /// whether this enters a new region or returns to a previous count
-    is_region_entry: usize,
+    pub is_region_entry: usize,
     /// Whether this enters a gap region
-    is_gap_region: usize,
+    pub is_gap_region: usize,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub struct FunctionRecordHeader {
-    name_hash: u64,
-    data_len: u32,
-    func_hash: u64,
-    filenames_ref: u64,
+    pub name_hash: u64,
+    pub data_len: u32,
+    pub fn_hash: u64,
+    pub filenames_ref: u64,
 }
 
 /// This type contains a header showing which function it refers to and then a list of regions in
@@ -198,41 +198,41 @@ pub struct FunctionRecordHeader {
 /// to indexes in the expressions list.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub struct FunctionRecordV3 {
-    header: FunctionRecordHeader,
-    regions: Vec<CounterMappingRegion>,
-    expressions: Vec<Expression>,
+    pub header: FunctionRecordHeader,
+    pub regions: Vec<CounterMappingRegion>,
+    pub expressions: Vec<Expression>,
 }
 
 /// Coverage mapping information for a single function. The equivalent llvm type is
 /// `CoverageMappingRecord`.
 pub struct CoverageMappingRecord {
-    fn_name: String,
-    fn_hash: u64,
-    file_names: Vec<String>,
-    expressions: Vec<Expression>,
-    mapping_regions: Vec<CounterMappingRegion>,
+    pub fn_name: String,
+    pub fn_hash: u64,
+    pub file_names: Vec<String>,
+    pub expressions: Vec<Expression>,
+    pub mapping_regions: Vec<CounterMappingRegion>,
 }
 
 /// Associates a source range with a specific counter. The equivalent llvm type is `CountedRegion`.
 pub struct CountedRegion {
-    execution_count: usize,
-    false_execution_count: usize,
-    folded: bool,
-    region: CounterMappingRegion,
+    pub execution_count: usize,
+    pub false_execution_count: usize,
+    pub folded: bool,
+    pub region: CounterMappingRegion,
 }
 
 /// This is the code coverage information for a single function. It is equivalent to
 /// `FunctionRecord` but has been renamed to avoid confusion with `FunctionRecordV3` etc
 pub struct FunctionCoverageRecord {
     /// Raw function name
-    name: String,
+    pub name: String,
     /// This is a list to allow for macro expansions within a function where the macro is defined
     /// in a different source file
-    filenames: Vec<String>,
+    pub filenames: Vec<String>,
     /// regions in the function with their counts
-    counted_regions: Vec<CountedRegion>,
+    pub counted_regions: Vec<CountedRegion>,
     /// Branch regions with their counts
-    counted_branch_regions: Vec<CountedRegion>,
+    pub counted_branch_regions: Vec<CountedRegion>,
     /// Number of times the function was executed
-    execution_count: usize,
+    pub execution_count: usize,
 }

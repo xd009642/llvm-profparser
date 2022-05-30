@@ -18,7 +18,7 @@ use std::path::{Path, PathBuf};
 #[derive(Debug)]
 pub struct CoverageMapping<'a> {
     profile: &'a InstrumentationProfile,
-    mapping_info: Vec<CoverageMappingInfo>,
+    pub mapping_info: Vec<CoverageMappingInfo>,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -163,12 +163,12 @@ fn parse_coverage_functions<'data, 'file>(
         while !bytes.is_empty() {
             let name_hash = endian.read_u64_bytes(bytes[0..8].try_into().unwrap());
             let data_len = endian.read_u32_bytes(bytes[8..12].try_into().unwrap());
-            let func_hash = endian.read_u64_bytes(bytes[12..20].try_into().unwrap());
+            let fn_hash = endian.read_u64_bytes(bytes[12..20].try_into().unwrap());
             let filenames_ref = endian.read_u64_bytes(bytes[20..28].try_into().unwrap());
             let header = FunctionRecordHeader {
                 name_hash,
                 data_len,
-                func_hash,
+                fn_hash,
                 filenames_ref,
             };
             let start_len = bytes[28..].len();
@@ -199,7 +199,7 @@ fn parse_coverage_functions<'data, 'file>(
             let (data, regions) =
                 parse_mapping_regions(bytes, &filename_indices, &mut exprs).unwrap();
 
-            if func_hash != 0 {
+            if fn_hash != 0 {
                 res.push(FunctionRecordV3 {
                     header,
                     regions,

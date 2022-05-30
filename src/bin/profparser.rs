@@ -381,3 +381,30 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn weight_arg_parsing() {
+        // Examples taken from LLVM docs
+        let foo_10 = "10,foo.profdata";
+        let bar_1 = "1,bar.profdata";
+
+        assert_eq!(
+            Ok((10, "foo.profdata".to_string())),
+            try_parse_weighted(foo_10)
+        );
+        assert_eq!(
+            Ok((1, "bar.profdata".to_string())),
+            try_parse_weighted(bar_1)
+        );
+        assert_eq!(
+            Ok((1, "foo.profdata".to_string())),
+            try_parse_weighted("foo.profdata")
+        );
+        assert!(try_parse_weighted("foo.profdata,1").is_err());
+        assert!(try_parse_weighted("1,1,foo.profdata").is_err());
+    }
+}
