@@ -9,8 +9,16 @@ use std::fmt;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+/// So what the LLVM one has that this one doesn't yet:
+/// 1. DenseMap<size_t, DenseSet<size_t>> RecordProvenance
+/// 2. std::vector<FunctionRecord> functions (this is probably taken straight from
+/// InstrumentationProfile
+/// 3. DenseMap<size_t, SmallVector<unsigned, 0>> FilenameHash2RecordIndices
+/// 4. Vec<Pair<String, u64>> FuncHashMismatches
+#[derive(Debug)]
 pub struct CoverageMapping<'a> {
     profile: &'a InstrumentationProfile,
+    pub mapping_info: Vec<CoverageMappingInfo>,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -91,13 +99,16 @@ impl<'a> CoverageMapping<'a> {
         object_files: &[PathBuf],
         profile: &'a InstrumentationProfile,
     ) -> Result<Self, Box<dyn Error>> {
-        let mut mappings = vec![];
+        let mut mapping_info = vec![];
         println!("profile:\n{:#?}", profile);
         for file in object_files {
-            mappings.push(read_object_file(file.as_path())?);
+            mapping_info.push(read_object_file(file.as_path())?);
         }
-        println!("Mappings:\n{:#?}", mappings);
-        todo!("Mapping of coverage profile and counters");
+        println!("Mappings:\n{:#?}", mapping_info);
+        Ok(Self {
+            profile,
+            mapping_info,
+        })
     }
 }
 
@@ -152,12 +163,12 @@ fn parse_coverage_functions<'data, 'file>(
         while !bytes.is_empty() {
             let name_hash = endian.read_u64_bytes(bytes[0..8].try_into().unwrap());
             let data_len = endian.read_u32_bytes(bytes[8..12].try_into().unwrap());
-            let func_hash = endian.read_u64_bytes(bytes[12..20].try_into().unwrap());
+            let fn_hash = endian.read_u64_bytes(bytes[12..20].try_into().unwrap());
             let filenames_ref = endian.read_u64_bytes(bytes[20..28].try_into().unwrap());
             let header = FunctionRecordHeader {
                 name_hash,
                 data_len,
-                func_hash,
+                fn_hash,
                 filenames_ref,
             };
             let start_len = bytes[28..].len();
@@ -172,22 +183,34 @@ fn parse_coverage_functions<'data, 'file>(
                 bytes = data;
             }
             let (data, expr_len) = parse_leb128(bytes).unwrap();
+            let expr_len = expr_len as usize;
             bytes = data;
-            let mut exprs = vec![];
-            for _ in 0..expr_len {
+            let mut exprs = vec![Expression::default(); expr_len];
+            for i in 0..expr_len {
                 let (data, lhs) = parse_leb128(bytes).unwrap();
                 let (data, rhs) = parse_leb128(data).unwrap();
-                let lhs = parse_counter(lhs);
-                let rhs = parse_counter(rhs);
-                exprs.push(Expression { lhs, rhs });
+                let lhs = parse_counter(lhs, &mut exprs);
+                let rhs = parse_counter(rhs, &mut exprs);
+                exprs[i].lhs = lhs;
+                exprs[i].rhs = rhs;
                 bytes = data;
             }
 
-            let (data, regions) = parse_mapping_regions(bytes, &filename_indices).unwrap();
+            let (data, regions) =
+                parse_mapping_regions(bytes, &filename_indices, &mut exprs).unwrap();
 
-            if func_hash != 0 {
-                res.push(FunctionRecordV3 { header, regions });
+            if fn_hash != 0 {
+                res.push(FunctionRecordV3 {
+                    header,
+                    regions,
+                    expressions: exprs,
+                });
             }
+
+            // Todo set couners for expansion regions - counter of expansion region is the counter
+            // of the first region from the expanded file. This requires multiple passes to
+            // correctly propagate across all nested regions. N.B. I haven't seen any expansion
+            // regions in use so may not be an issue!
 
             bytes = data;
             let function_len = section_len - bytes.len(); // this should match header
@@ -213,9 +236,11 @@ fn parse_coverage_functions<'data, 'file>(
     }
 }
 
+/// This code is ported from `RawCoverageMappingReader::readMappingRegionsSubArray`
 fn parse_mapping_regions<'a>(
     mut bytes: &'a [u8],
     file_indices: &[u64],
+    expressions: &mut Vec<Expression>,
 ) -> IResult<&'a [u8], Vec<CounterMappingRegion>> {
     let mut mapping = vec![];
     for i in file_indices {
@@ -223,15 +248,12 @@ fn parse_mapping_regions<'a>(
         bytes = data;
         let mut last_line = 0;
         for _ in 0..regions_len {
+            let mut false_count = Counter::default();
             let mut kind = RegionKind::Code;
             let (data, raw_header) = parse_leb128(bytes)?;
-            let (data, delta_line) = parse_leb128(data)?;
-            let (data, column_start) = parse_leb128(data)?;
-            let (data, lines_len) = parse_leb128(data)?;
-            let (data, column_end) = parse_leb128(data)?;
             bytes = data;
             let mut expanded_file_id = 0;
-            let counter = parse_counter(raw_header);
+            let mut counter = parse_counter(raw_header, expressions);
             if counter.kind == CounterType::Zero {
                 if raw_header & Counter::ENCODING_EXPANSION_REGION_BIT > 0 {
                     kind = RegionKind::Expansion;
@@ -243,10 +265,25 @@ fn parse_mapping_regions<'a>(
                     let shifted_counter = raw_header >> Counter::ENCODING_TAG_AND_EXP_REGION_BITS;
                     match shifted_counter.try_into() {
                         Ok(RegionKind::Code) | Ok(RegionKind::Skipped) => {}
+                        Ok(RegionKind::Branch) => {
+                            kind = RegionKind::Branch;
+                            let (data, c1) = parse_leb128(bytes)?;
+                            let (data, c2) = parse_leb128(bytes)?;
+
+                            counter = parse_counter(c1, expressions);
+                            false_count = parse_counter(c2, expressions);
+                            bytes = data;
+                        }
                         e => panic!("Malformed: {:?}", e),
                     }
                 }
             }
+
+            let (data, delta_line) = parse_leb128(bytes)?;
+            let (data, column_start) = parse_leb128(data)?;
+            let (data, lines_len) = parse_leb128(data)?;
+            let (data, column_end) = parse_leb128(data)?;
+            bytes = data;
 
             let (column_start, column_end) = if column_start == 0 && column_end == 0 {
                 (1usize, usize::MAX)
@@ -262,6 +299,7 @@ fn parse_mapping_regions<'a>(
             mapping.push(CounterMappingRegion {
                 kind,
                 count: counter,
+                false_count,
                 file_id: *i as usize,
                 expanded_file_id: expanded_file_id as _,
                 line_start,
@@ -341,4 +379,27 @@ fn parse_profile_names<'data, 'file>(
     } else {
         Err(SectionReadError::EmptySection(LlvmSection::ProfileNames))
     }
+}
+
+/// The equivalent llvm function is `RawCoverageMappingReader::decodeCounter`. This makes it
+/// stateless as I don't want to be maintaining an expression vector and clearing it and
+/// repopulating for every function record.
+fn parse_counter(input: u64, exprs: &mut Vec<Expression>) -> Counter {
+    let ty = (Counter::ENCODING_TAG_MASK & input) as u8;
+    let id = input >> 2; // For zero we don't actually care about this but we'll still do it
+    let kind = match ty {
+        0 => CounterType::Zero,
+        1 => CounterType::ProfileInstrumentation,
+        2 | 3 => {
+            let expr_kind = if ty == 2 {
+                ExprKind::Subtract
+            } else {
+                ExprKind::Add
+            };
+            exprs[id as usize].set_kind(expr_kind);
+            CounterType::Expression(expr_kind)
+        }
+        _ => unreachable!(),
+    };
+    Counter { kind, id }
 }

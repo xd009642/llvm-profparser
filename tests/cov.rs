@@ -1,4 +1,4 @@
-use llvm_profparser::{merge_profiles, parse, parse_bytes};
+use llvm_profparser::{merge_profiles, parse, parse_bytes, CoverageMapping};
 use pretty_assertions::assert_eq;
 use std::collections::HashSet;
 use std::ffi::OsStr;
@@ -73,4 +73,41 @@ fn check_command(ext: &OsStr) {
     if count == 0 {
         panic!("No tests for this LLVM version");
     }
+}
+
+#[test]
+fn check_mapping_consistency() {
+    let example = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/cov");
+    let obj = example.join("simple_project");
+    let prof = example.join("simple_project.profraw");
+
+    let instr = parse(prof).unwrap();
+
+    let mapping = CoverageMapping::new(&[obj], &instr).unwrap();
+    let info = &mapping.mapping_info[0];
+    for record in &instr.records {
+        let fun = info
+            .cov_fun
+            .iter()
+            .find(|x| record.hash == Some(x.header.fn_hash))
+            .unwrap();
+        assert!(info.cov_map.contains_key(&fun.header.filenames_ref));
+        let sym_name = instr.symtab.get(fun.header.name_hash);
+        assert_eq!(sym_name, record.name.as_ref());
+        // record.name record.hash record.counts() + more
+
+        // mapping.mapping_info
+        //      mapping_info.cov_map
+        //      mapping_info.cov_fun
+        //      mapping_info.prof_names
+        //      mapping_info.prof_counts
+        //      mapping_info.prof_data
+    }
+
+    let expected_len = info
+        .prof_data
+        .iter()
+        .map(|x| x.counters_len as usize)
+        .sum::<usize>();
+    assert_eq!(expected_len, info.prof_counts.len());
 }

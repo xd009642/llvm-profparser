@@ -49,6 +49,10 @@ impl Symtab {
     pub fn contains(&self, hash: u64) -> bool {
         self.names.contains_key(&hash)
     }
+
+    pub fn get(&self, hash: u64) -> Option<&String> {
+        self.names.get(&hash)
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Ord, PartialOrd, Hash)]
