@@ -32,11 +32,23 @@ impl CoverageReport {
 }
 
 impl CoverageResult {
+    pub fn max_hits(&self) -> usize {
+        self.hits.values().max().copied().unwrap_or_default()
+    }
+
     pub fn insert(&mut self, loc: SourceLocation, count: usize) {
         self.hits
             .entry(loc)
             .and_modify(|x| *x += count)
             .or_insert(count);
+    }
+
+    /// For line coverage just finds first region that mentions this line
+    pub fn hits_for_line(&self, line: usize) -> Option<usize> {
+        self.hits
+            .iter()
+            .find(|(k, _)| k.line_start <= line && k.line_end >= line)
+            .map(|(_, v)| *v)
     }
 }
 
