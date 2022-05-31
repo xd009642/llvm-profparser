@@ -1,8 +1,9 @@
+use crate::coverage::reporting::*;
 use crate::coverage::*;
 use crate::instrumentation_profile::types::*;
 use crate::util::*;
 use object::{Endian, Endianness, Object, ObjectSection, Section};
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::convert::TryInto;
 use std::error::Error;
 use std::fmt;
@@ -100,15 +101,70 @@ impl<'a> CoverageMapping<'a> {
         profile: &'a InstrumentationProfile,
     ) -> Result<Self, Box<dyn Error>> {
         let mut mapping_info = vec![];
-        println!("profile:\n{:#?}", profile);
         for file in object_files {
             mapping_info.push(read_object_file(file.as_path())?);
         }
-        println!("Mappings:\n{:#?}", mapping_info);
         Ok(Self {
             profile,
             mapping_info,
         })
+    }
+
+    pub fn generate_report(&self) -> CoverageReport {
+        let mut report = CoverageReport::default();
+        for info in &self.mapping_info {
+            for func in &info.cov_fun {
+                let path = match info.get_file_from_id(func.header.filenames_ref) {
+                    Some(s) => s,
+                    None => continue,
+                };
+
+                let result = report.files.entry(path).or_default();
+
+                let record = self
+                    .profile
+                    .records
+                    .iter()
+                    .find(|x| x.hash == Some(func.header.fn_hash));
+                let mut region_ids = HashMap::new();
+                for region in func.regions.iter().filter(|x| !x.count.is_expression()) {
+                    let count = match record.as_ref() {
+                        Some(rec) => rec
+                            .counts()
+                            .get(region.count.id as usize)
+                            .copied()
+                            .unwrap_or_default(),
+                        None => 0,
+                    };
+                    region_ids.insert(region.count.clone(), count);
+                    result.insert(region.loc.clone(), count as usize);
+                }
+
+                for (expr_index, expr) in func.expressions.iter().enumerate() {
+                    let lhs = region_ids.get(&expr.lhs).unwrap();
+                    let rhs = region_ids.get(&expr.rhs).unwrap();
+                    let count = match expr.kind {
+                        ExprKind::Subtract => lhs - rhs,
+                        ExprKind::Add => lhs + rhs,
+                    };
+
+                    let counter = Counter {
+                        kind: CounterType::Expression(expr.kind),
+                        id: expr_index as _,
+                    };
+
+                    region_ids.insert(counter, count);
+                    if let Some(expr_region) = func
+                        .regions
+                        .iter()
+                        .find(|x| x.count.is_expression() && x.count.id == expr_index as u64)
+                    {
+                        result.insert(expr_region.loc.clone(), count as _);
+                    }
+                }
+            }
+        }
+        report
     }
 }
 
@@ -302,10 +358,12 @@ fn parse_mapping_regions<'a>(
                 false_count,
                 file_id: *i as usize,
                 expanded_file_id: expanded_file_id as _,
-                line_start,
-                line_end,
-                column_start,
-                column_end,
+                loc: SourceLocation {
+                    line_start,
+                    line_end,
+                    column_start,
+                    column_end,
+                },
             });
         }
     }

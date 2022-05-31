@@ -41,10 +41,10 @@ impl ShowCommand {
         } else {
             panic!("Must provide an instrumentation profile");
         };
-        let mapping = CoverageMapping::new(&self.objects, &instr_prof);
-        println!("Profile: {:?}", instr_prof);
-        println!("Mapping: {:?}", mapping);
-        todo!();
+        let mapping = CoverageMapping::new(&self.objects, &instr_prof)?;
+        let report = mapping.generate_report();
+        println!("Coverage report:\n{:#?}", report);
+        Ok(())
     }
 }
 

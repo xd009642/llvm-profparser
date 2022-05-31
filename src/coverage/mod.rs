@@ -1,6 +1,7 @@
 use nom::IResult;
 use std::collections::HashMap;
 use std::convert::TryFrom;
+use std::path::PathBuf;
 
 pub mod coverage_mapping;
 pub mod reporting;
@@ -12,6 +13,21 @@ pub struct CoverageMappingInfo {
     pub prof_names: Vec<String>,
     pub prof_counts: Vec<u64>,
     pub prof_data: Vec<ProfileData>,
+}
+
+impl CoverageMappingInfo {
+    pub fn get_file_from_id(&self, id: u64) -> Option<PathBuf> {
+        if let Some(v) = self.cov_map.get(&id) {
+            v.get(0).map(PathBuf::from).map(|mut x| {
+                for parts in v.iter().skip(1) {
+                    x.push(parts);
+                }
+                x
+            })
+        } else {
+            None
+        }
+    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
@@ -100,6 +116,14 @@ impl Counter {
         matches!(self.kind, CounterType::Expression(_))
     }
 
+    pub fn is_instrumentation(&self) -> bool {
+        self.kind == CounterType::ProfileInstrumentation
+    }
+
+    pub fn is_zero(&self) -> bool {
+        self.kind == CounterType::Zero
+    }
+
     /// Gets the kind of the expression
     ///
     /// # Panics
@@ -160,9 +184,19 @@ pub struct CounterMappingRegion {
     pub false_count: Counter,
     pub file_id: usize,
     pub expanded_file_id: usize,
+    pub loc: SourceLocation,
+}
+
+/// Refers to a location in the source code
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct SourceLocation {
+    /// The start line of the coverage region
     pub line_start: usize,
+    /// The start column of the coverage region
     pub column_start: usize,
+    /// The last line of the coverage region (inclusive)
     pub line_end: usize,
+    /// The last column of the coverage region (inclusive)
     pub column_end: usize,
 }
 

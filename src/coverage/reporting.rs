@@ -1,6 +1,29 @@
+use crate::coverage::*;
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::str::FromStr;
 use thiserror::Error;
+
+#[derive(Clone, Debug, Default)]
+pub struct CoverageReport {
+    pub files: BTreeMap<PathBuf, CoverageResult>,
+}
+
+pub struct RegionCoverage {}
+
+#[derive(Clone, Debug, Default)]
+pub struct CoverageResult {
+    pub hits: BTreeMap<SourceLocation, usize>,
+}
+
+impl CoverageResult {
+    pub fn insert(&mut self, loc: SourceLocation, count: usize) {
+        self.hits
+            .entry(loc)
+            .and_modify(|x| *x += count)
+            .or_insert(count);
+    }
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Error)]
 pub enum RemappingParseError {
