@@ -126,6 +126,7 @@ impl<'a> CoverageMapping<'a> {
                     .iter()
                     .find(|x| x.hash == Some(func.header.fn_hash));
                 let mut region_ids = HashMap::new();
+                region_ids.insert(Counter::default(), 0);
                 for region in func.regions.iter().filter(|x| !x.count.is_expression()) {
                     let count = match record.as_ref() {
                         Some(rec) => rec
