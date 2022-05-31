@@ -111,15 +111,14 @@ impl<'a> CoverageMapping<'a> {
     }
 
     pub fn generate_report(&self) -> CoverageReport {
+        println!("{:#?}", self);
         let mut report = CoverageReport::default();
         for info in &self.mapping_info {
             for func in &info.cov_fun {
-                let path = match info.get_file_from_id(func.header.filenames_ref) {
-                    Some(s) => s,
-                    None => continue,
-                };
-
-                let result = report.files.entry(path).or_default();
+                let paths = info.get_files_from_id(func.header.filenames_ref);
+                if paths.is_empty() {
+                    continue;
+                }
 
                 let record = self
                     .profile
@@ -137,29 +136,87 @@ impl<'a> CoverageMapping<'a> {
                         None => 0,
                     };
                     region_ids.insert(region.count.clone(), count);
+
+                    let result = report
+                        .files
+                        .entry(paths[region.file_id].clone())
+                        .or_default();
                     result.insert(region.loc.clone(), count as usize);
                 }
 
+                let mut pending_exprs = vec![];
+
                 for (expr_index, expr) in func.expressions.iter().enumerate() {
-                    let lhs = region_ids.get(&expr.lhs).unwrap();
-                    let rhs = region_ids.get(&expr.rhs).unwrap();
-                    let count = match expr.kind {
-                        ExprKind::Subtract => lhs - rhs,
-                        ExprKind::Add => lhs + rhs,
-                    };
+                    let lhs = region_ids.get(&expr.lhs);
+                    let rhs = region_ids.get(&expr.rhs);
+                    match (lhs, rhs) {
+                        (Some(lhs), Some(rhs)) => {
+                            let count = match expr.kind {
+                                ExprKind::Subtract => lhs - rhs,
+                                ExprKind::Add => lhs + rhs,
+                            };
 
-                    let counter = Counter {
-                        kind: CounterType::Expression(expr.kind),
-                        id: expr_index as _,
-                    };
+                            let counter = Counter {
+                                kind: CounterType::Expression(expr.kind),
+                                id: expr_index as _,
+                            };
 
-                    region_ids.insert(counter, count);
-                    if let Some(expr_region) = func
-                        .regions
-                        .iter()
-                        .find(|x| x.count.is_expression() && x.count.id == expr_index as u64)
-                    {
-                        result.insert(expr_region.loc.clone(), count as _);
+                            region_ids.insert(counter, count);
+                            if let Some(expr_region) = func.regions.iter().find(|x| {
+                                x.count.is_expression() && x.count.id == expr_index as u64
+                            }) {
+                                let result = report
+                                    .files
+                                    .entry(paths[expr_region.file_id].clone())
+                                    .or_default();
+                                result.insert(expr_region.loc.clone(), count as _);
+                            }
+                        }
+                        _ => {
+                            pending_exprs.push((expr_index, expr));
+                            continue;
+                        }
+                    }
+                }
+                let mut index = 0;
+                let mut tries = 0;
+                while !pending_exprs.is_empty() {
+                    tries += 1;
+                    assert!(tries < 10);
+                    if index >= pending_exprs.len() {
+                        index = 0;
+                    }
+                    let (expr_index, expr) = pending_exprs[index];
+                    let lhs = region_ids.get(&expr.lhs);
+                    let rhs = region_ids.get(&expr.rhs);
+                    match (lhs, rhs) {
+                        (Some(lhs), Some(rhs)) => {
+                            pending_exprs.remove(index);
+                            let count = match expr.kind {
+                                ExprKind::Subtract => lhs - rhs,
+                                ExprKind::Add => lhs + rhs,
+                            };
+
+                            let counter = Counter {
+                                kind: CounterType::Expression(expr.kind),
+                                id: expr_index as _,
+                            };
+
+                            region_ids.insert(counter, count);
+                            if let Some(expr_region) = func.regions.iter().find(|x| {
+                                x.count.is_expression() && x.count.id == expr_index as u64
+                            }) {
+                                let result = report
+                                    .files
+                                    .entry(paths[expr_region.file_id].clone())
+                                    .or_default();
+                                result.insert(expr_region.loc.clone(), count as _);
+                            }
+                        }
+                        _ => {
+                            index += 1;
+                            continue;
+                        }
                     }
                 }
             }

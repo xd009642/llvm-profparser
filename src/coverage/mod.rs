@@ -16,17 +16,21 @@ pub struct CoverageMappingInfo {
 }
 
 impl CoverageMappingInfo {
-    pub fn get_file_from_id(&self, id: u64) -> Option<PathBuf> {
+    /// Gets the files for a given ID converted to their absolute representation
+    pub fn get_files_from_id(&self, id: u64) -> Vec<PathBuf> {
+        let mut paths = vec![];
         if let Some(v) = self.cov_map.get(&id) {
-            v.get(0).map(PathBuf::from).map(|mut x| {
-                for parts in v.iter().skip(1) {
-                    x.push(parts);
+            let mut last_absolute = PathBuf::new();
+            for path in v.iter().map(PathBuf::from) {
+                if path.is_absolute() {
+                    last_absolute = path.clone();
+                    paths.push(path.clone());
+                } else {
+                    paths.push(last_absolute.join(path))
                 }
-                x
-            })
-        } else {
-            None
+            }
         }
+        paths
     }
 }
 
