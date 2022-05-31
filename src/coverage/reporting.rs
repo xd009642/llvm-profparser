@@ -9,11 +9,26 @@ pub struct CoverageReport {
     pub files: BTreeMap<PathBuf, CoverageResult>,
 }
 
-pub struct RegionCoverage {}
-
 #[derive(Clone, Debug, Default)]
 pub struct CoverageResult {
     pub hits: BTreeMap<SourceLocation, usize>,
+}
+
+impl CoverageReport {
+    pub fn apply_remapping(&mut self, remapping: &PathRemapping) {
+        let inputs = self.files.keys().cloned().collect::<Vec<_>>();
+        for path in &inputs {
+            if path.starts_with(&remapping.source) {
+                let end = path.strip_prefix(&remapping.source).unwrap();
+                let new_path = remapping.dest.join(end);
+                if let Some(values) = self.files.remove(path) {
+                    self.files.insert(new_path, values);
+                } else {
+                    unreachable!();
+                }
+            }
+        }
+    }
 }
 
 impl CoverageResult {
