@@ -20,13 +20,24 @@ impl CoverageMappingInfo {
     pub fn get_files_from_id(&self, id: u64) -> Vec<PathBuf> {
         let mut paths = vec![];
         if let Some(v) = self.cov_map.get(&id) {
-            let mut last_absolute = PathBuf::new();
+            let mut last_absolute = None;
             for path in v.iter().map(PathBuf::from) {
                 if path.is_absolute() {
-                    last_absolute = path.clone();
+                    // Currently all examples I've checked have the base path as first arg and any
+                    // paths not in that directory are an absolute path. Now thread/local.rs in the
+                    // rust std is given an absolute path that doesn't exist on the system (I guess
+                    // it's compiled elsewhere). And also due to not having remapping info paths
+                    // may not be present. Meaning we can't use existence as a requirement to see
+                    // if it's a directory or not. And I'd rather not do name based heuristics so
+                    // just taking the first absolute path as the folder path and hoping LLVM keeps
+                    // to that convention
+                    if last_absolute.is_none() {
+                        last_absolute = Some(path.clone());
+                    }
                     paths.push(path.clone());
                 } else {
-                    paths.push(last_absolute.join(path))
+                    let base = last_absolute.clone().unwrap_or_default();
+                    paths.push(base.join(path))
                 }
             }
         }
