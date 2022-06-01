@@ -50,6 +50,7 @@ impl ShowCommand {
         println!("Coverage report:");
 
         for (path, result) in report.files.iter() {
+            println!("Processing: {}", path.display());
             // Read file to string
             let source = fs::read_to_string(path)?;
             let column_width = result.max_hits().to_string().len();

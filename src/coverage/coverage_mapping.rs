@@ -111,7 +111,6 @@ impl<'a> CoverageMapping<'a> {
     }
 
     pub fn generate_report(&self) -> CoverageReport {
-        println!("{:#?}", self);
         let mut report = CoverageReport::default();
         for info in &self.mapping_info {
             for func in &info.cov_fun {
@@ -127,6 +126,7 @@ impl<'a> CoverageMapping<'a> {
                     .find(|x| x.hash == Some(func.header.fn_hash));
                 let mut region_ids = HashMap::new();
                 region_ids.insert(Counter::default(), 0);
+
                 for region in func.regions.iter().filter(|x| !x.count.is_expression()) {
                     let count = match record.as_ref() {
                         Some(rec) => rec
@@ -174,18 +174,29 @@ impl<'a> CoverageMapping<'a> {
                             }
                         }
                         _ => {
+                            let lhs_none = lhs.is_none();
+                            let rhs_none = rhs.is_none();
+                            std::mem::drop(lhs);
+                            std::mem::drop(rhs);
+                            // These counters have been optimised out, so just add then in as 0
+                            if lhs_none && expr.lhs.kind == CounterType::ProfileInstrumentation {
+                                region_ids.insert(expr.lhs.clone(), 0);
+                            }
+                            if rhs_none && expr.rhs.kind == CounterType::ProfileInstrumentation {
+                                region_ids.insert(expr.rhs.clone(), 0);
+                            }
                             pending_exprs.push((expr_index, expr));
                             continue;
                         }
                     }
                 }
                 let mut index = 0;
-                let mut tries = 0;
+                let mut tries_left = pending_exprs.len() + 1;
                 while !pending_exprs.is_empty() {
-                    tries += 1;
-                    assert!(tries < 10);
+                    assert!(tries_left > 0);
                     if index >= pending_exprs.len() {
                         index = 0;
+                        tries_left -= 1;
                     }
                     let (expr_index, expr) = pending_exprs[index];
                     let lhs = region_ids.get(&expr.lhs);
