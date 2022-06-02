@@ -50,19 +50,16 @@ impl ShowCommand {
         println!("Coverage report:");
 
         for (path, result) in report.files.iter() {
-            println!("Processing: {}", path.display());
             // Read file to string
             if let Ok(source) = fs::read_to_string(path) {
                 let column_width = result.max_hits().to_string().len();
-                let mut empty = (0..column_width).map(|_| ' ').collect::<String>();
-                empty.push('|');
                 println!("{}", path.display());
                 for (line, source) in source.lines().enumerate() {
+                    print!("{: >5}|", line + 1);
                     if let Some(hits) = result.hits_for_line(line + 1) {
-                        print!("{:1$}|", hits, column_width);
-                        println!("{}", source);
+                        println!("{: >7}|{}", hits, source);
                     } else {
-                        println!("{}{}", empty, source);
+                        println!("       |{}", source);
                     }
                 }
                 println!("");
