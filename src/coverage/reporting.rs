@@ -97,17 +97,21 @@ impl FromStr for PathRemapping {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn report_remapping() {
         let mut report = CoverageReport::default();
 
-        report.files.insert(PathBuf::from("/root/src/lib.rs"), CoverageResult::default());
-        report.files.insert(PathBuf::from("/home/root/src/lib.rs"), CoverageResult::default());
+        report
+            .files
+            .insert(PathBuf::from("/root/src/lib.rs"), CoverageResult::default());
+        report.files.insert(
+            PathBuf::from("/home/root/src/lib.rs"),
+            CoverageResult::default(),
+        );
 
         let remapping = PathRemapping {
             source: PathBuf::from("/root/src"),
@@ -117,9 +121,11 @@ mod tests {
         report.apply_remapping(&remapping);
 
         assert_eq!(report.files.len(), 2);
-        assert!(report.files.contains_key(&PathBuf::from("/home/me/src/lib.rs")));
-        assert!(report.files.contains_key(&PathBuf::from("/home/root/src/lib.rs")));
+        assert!(report
+            .files
+            .contains_key(&PathBuf::from("/home/me/src/lib.rs")));
+        assert!(report
+            .files
+            .contains_key(&PathBuf::from("/home/root/src/lib.rs")));
     }
-
-
 }
