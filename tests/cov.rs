@@ -175,7 +175,7 @@ fn compare_reports(run: &Run) {
     assert!(profparser.len() > 0);
 
     for (llvm, me) in llvm.iter().zip(&profparser) {
-        //    assert_eq!(llvm, me); // currently fails
+        assert_eq!(llvm, me);
     }
 }
 

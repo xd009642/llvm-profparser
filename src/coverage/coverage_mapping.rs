@@ -119,11 +119,10 @@ impl<'a> CoverageMapping<'a> {
                     continue;
                 }
 
-                let record = self
-                    .profile
-                    .records
-                    .iter()
-                    .find(|x| x.hash == Some(func.header.fn_hash));
+                let record = self.profile.records.iter().find(|x| {
+                    x.hash == Some(func.header.fn_hash)
+                        && Some(func.header.name_hash) == x.name.as_ref().map(compute_hash)
+                });
                 let mut region_ids = HashMap::new();
                 region_ids.insert(Counter::default(), 0);
 
