@@ -47,13 +47,13 @@ impl ShowCommand {
         if let Some(remapping) = self.path_remapping.as_ref() {
             report.apply_remapping(remapping);
         }
-        println!("Coverage report:");
-
         for (path, result) in report.files.iter() {
             // Read file to string
             if let Ok(source) = fs::read_to_string(path) {
                 let column_width = result.max_hits().to_string().len();
-                println!("{}", path.display());
+                if report.files.len() > 1 {
+                    println!("{}", path.display());
+                }
                 for (line, source) in source.lines().enumerate() {
                     print!("{: >5}|", line + 1);
                     if let Some(hits) = result.hits_for_line(line + 1) {

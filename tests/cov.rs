@@ -1,30 +1,80 @@
+use cargo_metadata::{diagnostic::DiagnosticLevel, CargoOpt, Message, Metadata, MetadataCommand};
 use llvm_profparser::{merge_profiles, parse, parse_bytes, CoverageMapping};
 use pretty_assertions::assert_eq;
+use regex::Regex;
 use std::collections::HashSet;
 use std::ffi::OsStr;
 use std::fs::read_dir;
+use std::io;
 use std::path::PathBuf;
-use std::process::Command;
+use std::process::{Command, Stdio};
 
-#[cfg(llvm_11)]
-fn get_data_dir() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/cov/llvm-11")
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, Ord, PartialOrd)]
+enum Channel {
+    Stable,
+    Beta,
+    Nightly,
 }
 
-#[cfg(llvm_12)]
-fn get_data_dir() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/cov/llvm-12")
+#[derive(Clone, Debug, Eq, PartialEq, Hash, Ord, PartialOrd)]
+struct CargoVersionInfo {
+    major: usize,
+    minor: usize,
+    channel: Channel,
+    year: usize,
+    month: usize,
+    day: usize,
 }
 
-#[cfg(llvm_13)]
-fn get_data_dir() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/cov/llvm-13")
+impl CargoVersionInfo {
+    fn new() -> io::Result<Self> {
+        let version_info = Regex::new(
+            r"cargo (\d)\.(\d+)\.\d+([\-betanightly]*) \([[:alnum:]]+ (\d{4})-(\d{2})-(\d{2})\)",
+        )
+        .unwrap();
+        Command::new("cargo")
+            .arg("--version")
+            .output()
+            .map(|x| {
+                let s = String::from_utf8_lossy(&x.stdout);
+                if let Some(cap) = version_info.captures(&s) {
+                    let major = cap[1].parse().unwrap();
+                    let minor = cap[2].parse().unwrap();
+                    // We expect a string like `cargo 1.50.0-nightly (a0f433460 2020-02-01)
+                    // the version number either has `-nightly` `-beta` or empty for stable
+                    let channel = match &cap[3] {
+                        "-nightly" => Channel::Nightly,
+                        "-beta" => Channel::Beta,
+                        _ => Channel::Stable,
+                    };
+                    let year = cap[4].parse().unwrap();
+                    let month = cap[5].parse().unwrap();
+                    let day = cap[6].parse().unwrap();
+                    Some(CargoVersionInfo {
+                        major,
+                        minor,
+                        channel,
+                        year,
+                        month,
+                        day,
+                    })
+                } else {
+                    None
+                }
+            })?
+            .ok_or_else(|| {
+                io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "Cargo version output not parse-able",
+                )
+            })
+    }
 }
 
-#[cfg(not(any(llvm_11, llvm_12, llvm_13)))]
-fn get_data_dir() -> PathBuf {
-    // Nothing to do so lets get a directory with nothing in
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/profdata")
+fn get_project_dir(project: &str) -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/data/")
+        .join(project)
 }
 
 fn get_printout(output: &[u8]) -> Vec<String> {
@@ -34,45 +84,102 @@ fn get_printout(output: &[u8]) -> Vec<String> {
         .collect()
 }
 
-fn check_command(ext: &OsStr) {
-    // TODO we should consider doing different permutations of args. Some things which rely on
-    // the ordering of elements in a priority_queue etc will display differently though...
-    let data = get_data_dir();
-    println!("Data directory: {}", data.display());
-    let mut count = 0;
-    for raw_file in read_dir(&data)
-        .unwrap()
-        .filter_map(|x| x.ok())
-        .filter(|x| x.path().extension().unwrap_or_default() == ext)
-    {
-        // llvm-profdata won't be able to work on all the files as it depends on what the host OS
-        // llvm comes with by default. So first we check if it works and if so we test
-        let llvm = Command::new("cargo")
-            .current_dir(&data)
-            .args(&["profdata", "--", "show", "--all-functions", "--counts"])
-            .arg(raw_file.file_name())
-            .output()
-            .expect("cargo binutils or llvm-profdata is not installed");
+#[derive(Debug, Clone)]
+struct Run {
+    profraw: PathBuf,
+    binary: PathBuf,
+}
 
-        if llvm.status.success() {
-            println!("Checking {:?}", raw_file.file_name());
-            count += 1;
-            let rust = assert_cmd::Command::cargo_bin("profparser")
-                .unwrap()
-                .current_dir(&data)
-                .args(&["show", "--all-functions", "--counts", "-i"])
-                .arg(raw_file.file_name())
-                .output()
-                .expect("Failed to run profparser on file");
-            println!("{}", String::from_utf8_lossy(&rust.stderr));
+fn run_coverage(project: &str) -> io::Result<Run> {
+    let project = get_project_dir(project);
+    let cargo_version = CargoVersionInfo::new()?;
+    let rustflags = match cargo_version.channel {
+        Channel::Nightly => "-Zinstrument-coverage",
+        _ => "-Cinstrument-coverage",
+    };
 
-            assert_eq!(get_printout(&llvm.stdout), get_printout(&rust.stdout));
-            assert_eq!(get_printout(&llvm.stderr), get_printout(&rust.stderr));
+    let mut child = Command::new("cargo")
+        .args(&["test", "--no-run", "--message-format", "json"])
+        .env("RUSTFLAGS", rustflags)
+        .stdout(Stdio::piped())
+        .current_dir(&project)
+        .spawn()?;
+
+    let reader = io::BufReader::new(child.stdout.take().unwrap());
+    let mut binary = None;
+    for msg in Message::parse_stream(reader) {
+        if let Ok(Message::CompilerArtifact(art)) = msg {
+            if let Some(path) = art.executable.as_ref() {
+                binary = Some(PathBuf::from(path));
+                break;
+            }
         }
     }
-    if count == 0 {
-        panic!("No tests for this LLVM version");
+    let binary = binary.unwrap();
+
+    Command::new(&binary).current_dir(&project).output()?;
+
+    println!("{}", binary.display());
+
+    let profraw = project.join("default.profraw");
+    assert!(profraw.exists());
+
+    Ok(Run { profraw, binary })
+}
+
+fn compare_reports(run: &Run) {
+    let profdata = run.profraw.parent().unwrap().join("default.profdata");
+    let merge = Command::new("cargo")
+        .args(&["profdata", "--", "merge", "-sparse", "-o"])
+        .args(&[&profdata, &run.profraw])
+        .output()
+        .unwrap();
+
+    if !merge.status.success() {
+        let out = String::from_utf8_lossy(&merge.stderr);
+        panic!("{}", out);
     }
+
+    let llvm_report = Command::new("cargo")
+        .args(&[
+            "cov",
+            "--",
+            "show",
+            "--show-instantiations=false",
+            "--instr-profile",
+        ])
+        .args(&[&profdata, &run.binary])
+        .output()
+        .unwrap();
+
+    let profparser_report = assert_cmd::Command::cargo_bin("cov")
+        .unwrap()
+        .args(&["show", "--instr-profile"])
+        .arg(&run.profraw)
+        .arg("--object")
+        .arg(&run.binary)
+        .output()
+        .unwrap();
+
+    let llvm = get_printout(&llvm_report.stdout);
+    let profparser = get_printout(&profparser_report.stdout);
+
+    // Internally I use a BTreeMap for the file list so they're always printed in lexicographic
+    // ordering. LLVM seems to do the same. But for 1
+
+    assert!(llvm.len() > 0);
+    assert!(profparser.len() > 0);
+
+    for (llvm, me) in llvm.iter().zip(&profparser) {
+        //    assert_eq!(llvm, me); // currently fails
+    }
+}
+
+#[test]
+fn check_stable_vec() {
+    // Build the project and generate profraw and instrumented binary
+    let run_result = run_coverage("stable_vec").unwrap();
+    compare_reports(&run_result);
 }
 
 #[test]

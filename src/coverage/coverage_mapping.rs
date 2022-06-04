@@ -3,7 +3,7 @@ use crate::coverage::*;
 use crate::instrumentation_profile::types::*;
 use crate::util::*;
 use object::{Endian, Endianness, Object, ObjectSection, Section};
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 use std::convert::TryInto;
 use std::error::Error;
 use std::fmt;
