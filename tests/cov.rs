@@ -90,7 +90,7 @@ struct Run {
     binary: PathBuf,
 }
 
-fn run_coverage(project: &str) -> io::Result<Run> {
+fn run_coverage(project: &str) -> io::Result<Option<Run>> {
     let project = get_project_dir(project);
     let cargo_version = CargoVersionInfo::new()?;
     let rustflags = match cargo_version.channel {
@@ -115,6 +115,10 @@ fn run_coverage(project: &str) -> io::Result<Run> {
             }
         }
     }
+    if binary.is_none() {
+        // Okay this is our CI job with an old stable so can't build it. Just return Ok(None)
+        return Ok(None);
+    }
     let binary = binary.unwrap();
 
     Command::new(&binary).current_dir(&project).output()?;
@@ -124,7 +128,7 @@ fn run_coverage(project: &str) -> io::Result<Run> {
     let profraw = project.join("default.profraw");
     assert!(profraw.exists());
 
-    Ok(Run { profraw, binary })
+    Ok(Some(Run { profraw, binary }))
 }
 
 fn compare_reports(run: &Run) {
@@ -179,7 +183,9 @@ fn compare_reports(run: &Run) {
 fn check_stable_vec() {
     // Build the project and generate profraw and instrumented binary
     let run_result = run_coverage("stable_vec").unwrap();
-    compare_reports(&run_result);
+    if let Some(run_result) = run_result {
+        compare_reports(&run_result);
+    }
 }
 
 #[test]
