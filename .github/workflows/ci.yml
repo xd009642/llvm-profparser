@@ -17,9 +17,6 @@ jobs:
         target:
           - x86_64-unknown-linux-gnu
           - x86_64-unknown-linux-musl
-          - x86_64-pc-windows-gnu
-          - x86_64-pc-windows-msvc
-          - x86_64-apple-darwin	
       fail-fast: false
     steps:
       - uses: actions/checkout@v2
@@ -43,3 +40,50 @@ jobs:
           cargo install  --version 0.19.1 cargo-tarpaulin
           cargo tarpaulin --force-clean --exclude-files tests/data/* --follow-exec --coveralls ${{ secrets.CODECOV_TOKEN }}
         if: matrix.target == 'x86_64-unknown-linux-gnu' && matrix.version == 'stable'
+  windows:
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        version:
+          - stable 
+        target:
+          - x86_64-pc-windows-gnu
+          - x86_64-pc-windows-msvc
+      fail-fast: false
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ matrix.version }}
+          override: true
+          components: llvm-tools-preview
+        run: |
+          cargo check --no-default-features
+          cargo check --all-features
+      - name: test
+        run: |
+          cargo install cargo-binutils
+          cargo test 
+  mac:
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        version:
+          - stable 
+        target:
+          - x86_64-apple-darwin	
+      fail-fast: false
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ matrix.version }}
+          override: true
+          components: llvm-tools-preview
+        run: |
+          cargo check --no-default-features
+          cargo check --all-features
+      - name: test
+        run: |
+          cargo install cargo-binutils
+          cargo test 
