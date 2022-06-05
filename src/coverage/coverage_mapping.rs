@@ -323,13 +323,11 @@ fn parse_coverage_functions<'data, 'file>(
             let (data, regions) =
                 parse_mapping_regions(bytes, &filename_indices, &mut exprs).unwrap();
 
-            if fn_hash != 0 {
-                res.push(FunctionRecordV3 {
-                    header,
-                    regions,
-                    expressions: exprs,
-                });
-            }
+            res.push(FunctionRecordV3 {
+                header,
+                regions,
+                expressions: exprs,
+            });
 
             // Todo set couners for expansion regions - counter of expansion region is the counter
             // of the first region from the expanded file. This requires multiple passes to
