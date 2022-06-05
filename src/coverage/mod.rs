@@ -236,9 +236,14 @@ pub struct CoverageSegment {
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub struct FunctionRecordHeader {
+    /// Truncated MD5 hash of the function name
     pub name_hash: u64,
+    /// Length of the instrumentation data associated with the function
     pub data_len: u32,
+    /// Function hash can be zero if the function isn't in the compiled binary - such as unused
+    /// generic functions
     pub fn_hash: u64,
+    /// Hash reference of the file the function is defined in
     pub filenames_ref: u64,
 }
 
