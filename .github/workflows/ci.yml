@@ -59,7 +59,9 @@ jobs:
           override: true
           components: llvm-tools-preview
       - name: test
-        run: cargo test
+        run: |
+          cargo install cargo-binutils
+          cargo test
   mac:
     runs-on: macos-latest
     strategy:
@@ -77,4 +79,6 @@ jobs:
           override: true
           components: llvm-tools-preview
       - name: test
-        run: cargo test
+        run: |
+          cargo install cargo-binutils
+          cargo test
