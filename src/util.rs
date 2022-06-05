@@ -36,7 +36,12 @@ pub fn parse_string_list(input: &[u8]) -> IResult<&[u8], Vec<String>> {
     if compressed_size == 0 {
         let (input, values) = parse_uncompressed_list(input)?;
         if values.len() != list_length as usize {
-            println!("Didn't get {} names: {:?}", list_length, values);
+            println!(
+                "CGot {} instead of {} names: {:?}",
+                values.len(),
+                list_length,
+                values
+            );
         }
         Ok((input, values))
     } else {
@@ -63,7 +68,12 @@ pub fn parse_string_list(input: &[u8]) -> IResult<&[u8], Vec<String>> {
             }
         };
         if values.len() != list_length as usize {
-            println!("Didn't get {} names: {:?}", list_length, values);
+            println!(
+                "UCGot {} names instead of {}: {:?}",
+                values.len(),
+                list_length,
+                values
+            );
         }
         Ok((&input[compressed_size..], values))
     }
