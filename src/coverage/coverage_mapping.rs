@@ -71,7 +71,10 @@ pub fn read_object_file(object: &Path) -> Result<CoverageMappingInfo, Box<dyn Er
     let prof_names = object_file
         .section_by_name("__llvm_prf_names")
         .or(object_file.section_by_name(".lprfn"))
-        .map(|x| parse_profile_names(&x))
+        .map(|x| {
+            println!("PROFNAMES");
+            parse_profile_names(&x)
+        })
         .ok_or(SectionReadError::MissingSection(LlvmSection::ProfileNames))??;
 
     let prof_counts = object_file
