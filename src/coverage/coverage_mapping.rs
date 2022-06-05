@@ -56,7 +56,7 @@ pub fn read_object_file(object: &Path) -> Result<CoverageMappingInfo, Box<dyn Er
 
     let cov_fun = object_file
         .section_by_name("__llvm_covfun")
-        .or(object_file.section_by_name(".lcovfun$M"))
+        .or(object_file.section_by_name(".lcovfun"))
         .map(|x| parse_coverage_functions(object_file.endianness(), &x))
         .ok_or(SectionReadError::MissingSection(
             LlvmSection::CoverageFunctions,
@@ -64,25 +64,25 @@ pub fn read_object_file(object: &Path) -> Result<CoverageMappingInfo, Box<dyn Er
 
     let cov_map = object_file
         .section_by_name("__llvm_covmap")
-        .or(object_file.section_by_name(".lcovmap$M"))
+        .or(object_file.section_by_name(".lcovmap"))
         .map(|x| parse_coverage_mapping(object_file.endianness(), &x))
         .ok_or(SectionReadError::MissingSection(LlvmSection::CoverageMap))??;
 
     let prof_names = object_file
         .section_by_name("__llvm_prf_names")
-        .or(object_file.section_by_name(".lprfn$M"))
+        .or(object_file.section_by_name(".lprfn"))
         .map(|x| parse_profile_names(&x))
         .ok_or(SectionReadError::MissingSection(LlvmSection::ProfileNames))??;
 
     let prof_counts = object_file
         .section_by_name("__llvm_prf_cnts")
-        .or(object_file.section_by_name(".lprfc$M"))
+        .or(object_file.section_by_name(".lprfc"))
         .map(|x| parse_profile_counters(object_file.endianness(), &x))
         .ok_or(SectionReadError::MissingSection(LlvmSection::ProfileCounts))??;
 
     let prof_data = object_file
         .section_by_name("__llvm_prf_data")
-        .or(object_file.section_by_name(".lprfd$M"))
+        .or(object_file.section_by_name(".lprfd"))
         .map(|x| parse_profile_data(object_file.endianness(), &x))
         .ok_or(SectionReadError::MissingSection(LlvmSection::ProfileData))??;
 
