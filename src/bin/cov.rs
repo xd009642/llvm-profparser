@@ -1,4 +1,5 @@
 use llvm_profparser::*;
+use std::fs;
 use std::path::PathBuf;
 use structopt::StructOpt;
 
@@ -41,10 +42,30 @@ impl ShowCommand {
         } else {
             panic!("Must provide an instrumentation profile");
         };
-        let mapping = CoverageMapping::new(&self.objects, &instr_prof);
-        println!("Profile: {:?}", instr_prof);
-        println!("Mapping: {:?}", mapping);
-        todo!();
+        let mapping = CoverageMapping::new(&self.objects, &instr_prof)?;
+        let mut report = mapping.generate_report();
+        if let Some(remapping) = self.path_remapping.as_ref() {
+            report.apply_remapping(remapping);
+        }
+        for (path, result) in report.files.iter() {
+            // Read file to string
+            if let Ok(source) = fs::read_to_string(path) {
+                let column_width = result.max_hits().to_string().len();
+                if report.files.len() > 1 {
+                    println!("{}", path.display());
+                }
+                for (line, source) in source.lines().enumerate() {
+                    print!("{: >5}|", line + 1);
+                    if let Some(hits) = result.hits_for_line(line + 1) {
+                        println!("{: >7}|{}", hits, source);
+                    } else {
+                        println!("       |{}", source);
+                    }
+                }
+                println!("");
+            }
+        }
+        Ok(())
     }
 }
 

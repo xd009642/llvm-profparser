@@ -38,5 +38,5 @@ jobs:
       - name: code-coverage
         run: |
           cargo install  --version 0.19.1 cargo-tarpaulin
-          cargo tarpaulin --force-clean --follow-exec --coveralls ${{ secrets.CODECOV_TOKEN }}
+          cargo tarpaulin --force-clean --exclude-files tests/data/* --follow-exec --coveralls ${{ secrets.CODECOV_TOKEN }}
         if: matrix.target == 'x86_64-unknown-linux-gnu' && matrix.version == 'stable'

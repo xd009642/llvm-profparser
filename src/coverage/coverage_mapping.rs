@@ -1,3 +1,4 @@
+use crate::coverage::reporting::*;
 use crate::coverage::*;
 use crate::instrumentation_profile::types::*;
 use crate::util::*;
@@ -100,15 +101,138 @@ impl<'a> CoverageMapping<'a> {
         profile: &'a InstrumentationProfile,
     ) -> Result<Self, Box<dyn Error>> {
         let mut mapping_info = vec![];
-        println!("profile:\n{:#?}", profile);
         for file in object_files {
             mapping_info.push(read_object_file(file.as_path())?);
         }
-        println!("Mappings:\n{:#?}", mapping_info);
         Ok(Self {
             profile,
             mapping_info,
         })
+    }
+
+    pub fn generate_report(&self) -> CoverageReport {
+        let mut report = CoverageReport::default();
+        for info in &self.mapping_info {
+            for func in &info.cov_fun {
+                let paths = info.get_files_from_id(func.header.filenames_ref);
+                if paths.is_empty() {
+                    continue;
+                }
+
+                let record = self.profile.records.iter().find(|x| {
+                    x.hash == Some(func.header.fn_hash)
+                        && Some(func.header.name_hash) == x.name.as_ref().map(compute_hash)
+                });
+                let mut region_ids = HashMap::new();
+                region_ids.insert(Counter::default(), 0);
+
+                for region in func.regions.iter().filter(|x| !x.count.is_expression()) {
+                    let count = match record.as_ref() {
+                        Some(rec) => rec
+                            .counts()
+                            .get(region.count.id as usize)
+                            .copied()
+                            .unwrap_or_default(),
+                        None => 0,
+                    };
+                    region_ids.insert(region.count.clone(), count);
+
+                    let result = report
+                        .files
+                        .entry(paths[region.file_id].clone())
+                        .or_default();
+                    result.insert(region.loc.clone(), count as usize);
+                }
+
+                let mut pending_exprs = vec![];
+
+                for (expr_index, expr) in func.expressions.iter().enumerate() {
+                    let lhs = region_ids.get(&expr.lhs);
+                    let rhs = region_ids.get(&expr.rhs);
+                    match (lhs, rhs) {
+                        (Some(lhs), Some(rhs)) => {
+                            let count = match expr.kind {
+                                ExprKind::Subtract => lhs - rhs,
+                                ExprKind::Add => lhs + rhs,
+                            };
+
+                            let counter = Counter {
+                                kind: CounterType::Expression(expr.kind),
+                                id: expr_index as _,
+                            };
+
+                            region_ids.insert(counter, count);
+                            if let Some(expr_region) = func.regions.iter().find(|x| {
+                                x.count.is_expression() && x.count.id == expr_index as u64
+                            }) {
+                                let result = report
+                                    .files
+                                    .entry(paths[expr_region.file_id].clone())
+                                    .or_default();
+                                result.insert(expr_region.loc.clone(), count as _);
+                            }
+                        }
+                        _ => {
+                            let lhs_none = lhs.is_none();
+                            let rhs_none = rhs.is_none();
+                            std::mem::drop(lhs);
+                            std::mem::drop(rhs);
+                            // These counters have been optimised out, so just add then in as 0
+                            if lhs_none && expr.lhs.kind == CounterType::ProfileInstrumentation {
+                                region_ids.insert(expr.lhs.clone(), 0);
+                            }
+                            if rhs_none && expr.rhs.kind == CounterType::ProfileInstrumentation {
+                                region_ids.insert(expr.rhs.clone(), 0);
+                            }
+                            pending_exprs.push((expr_index, expr));
+                            continue;
+                        }
+                    }
+                }
+                let mut index = 0;
+                let mut tries_left = pending_exprs.len() + 1;
+                while !pending_exprs.is_empty() {
+                    assert!(tries_left > 0);
+                    if index >= pending_exprs.len() {
+                        index = 0;
+                        tries_left -= 1;
+                    }
+                    let (expr_index, expr) = pending_exprs[index];
+                    let lhs = region_ids.get(&expr.lhs);
+                    let rhs = region_ids.get(&expr.rhs);
+                    match (lhs, rhs) {
+                        (Some(lhs), Some(rhs)) => {
+                            pending_exprs.remove(index);
+                            let count = match expr.kind {
+                                ExprKind::Subtract => lhs - rhs,
+                                ExprKind::Add => lhs + rhs,
+                            };
+
+                            let counter = Counter {
+                                kind: CounterType::Expression(expr.kind),
+                                id: expr_index as _,
+                            };
+
+                            region_ids.insert(counter, count);
+                            if let Some(expr_region) = func.regions.iter().find(|x| {
+                                x.count.is_expression() && x.count.id == expr_index as u64
+                            }) {
+                                let result = report
+                                    .files
+                                    .entry(paths[expr_region.file_id].clone())
+                                    .or_default();
+                                result.insert(expr_region.loc.clone(), count as _);
+                            }
+                        }
+                        _ => {
+                            index += 1;
+                            continue;
+                        }
+                    }
+                }
+            }
+        }
+        report
     }
 }
 
@@ -199,13 +323,11 @@ fn parse_coverage_functions<'data, 'file>(
             let (data, regions) =
                 parse_mapping_regions(bytes, &filename_indices, &mut exprs).unwrap();
 
-            if fn_hash != 0 {
-                res.push(FunctionRecordV3 {
-                    header,
-                    regions,
-                    expressions: exprs,
-                });
-            }
+            res.push(FunctionRecordV3 {
+                header,
+                regions,
+                expressions: exprs,
+            });
 
             // Todo set couners for expansion regions - counter of expansion region is the counter
             // of the first region from the expanded file. This requires multiple passes to
@@ -302,10 +424,12 @@ fn parse_mapping_regions<'a>(
                 false_count,
                 file_id: *i as usize,
                 expanded_file_id: expanded_file_id as _,
-                line_start,
-                line_end,
-                column_start,
-                column_end,
+                loc: SourceLocation {
+                    line_start,
+                    line_end,
+                    column_start,
+                    column_end,
+                },
             });
         }
     }

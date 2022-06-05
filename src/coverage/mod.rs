@@ -1,6 +1,7 @@
 use nom::IResult;
 use std::collections::HashMap;
 use std::convert::TryFrom;
+use std::path::PathBuf;
 
 pub mod coverage_mapping;
 pub mod reporting;
@@ -12,6 +13,36 @@ pub struct CoverageMappingInfo {
     pub prof_names: Vec<String>,
     pub prof_counts: Vec<u64>,
     pub prof_data: Vec<ProfileData>,
+}
+
+impl CoverageMappingInfo {
+    /// Gets the files for a given ID converted to their absolute representation
+    pub fn get_files_from_id(&self, id: u64) -> Vec<PathBuf> {
+        let mut paths = vec![];
+        if let Some(v) = self.cov_map.get(&id) {
+            let mut last_absolute = None;
+            for path in v.iter().map(PathBuf::from) {
+                if path.is_absolute() {
+                    // Currently all examples I've checked have the base path as first arg and any
+                    // paths not in that directory are an absolute path. Now thread/local.rs in the
+                    // rust std is given an absolute path that doesn't exist on the system (I guess
+                    // it's compiled elsewhere). And also due to not having remapping info paths
+                    // may not be present. Meaning we can't use existence as a requirement to see
+                    // if it's a directory or not. And I'd rather not do name based heuristics so
+                    // just taking the first absolute path as the folder path and hoping LLVM keeps
+                    // to that convention
+                    if last_absolute.is_none() {
+                        last_absolute = Some(path.clone());
+                    }
+                    paths.push(path.clone());
+                } else {
+                    let base = last_absolute.clone().unwrap_or_default();
+                    paths.push(base.join(path))
+                }
+            }
+        }
+        paths
+    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
@@ -100,6 +131,14 @@ impl Counter {
         matches!(self.kind, CounterType::Expression(_))
     }
 
+    pub fn is_instrumentation(&self) -> bool {
+        self.kind == CounterType::ProfileInstrumentation
+    }
+
+    pub fn is_zero(&self) -> bool {
+        self.kind == CounterType::Zero
+    }
+
     /// Gets the kind of the expression
     ///
     /// # Panics
@@ -160,9 +199,19 @@ pub struct CounterMappingRegion {
     pub false_count: Counter,
     pub file_id: usize,
     pub expanded_file_id: usize,
+    pub loc: SourceLocation,
+}
+
+/// Refers to a location in the source code
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct SourceLocation {
+    /// The start line of the coverage region
     pub line_start: usize,
+    /// The start column of the coverage region
     pub column_start: usize,
+    /// The last line of the coverage region (inclusive)
     pub line_end: usize,
+    /// The last column of the coverage region (inclusive)
     pub column_end: usize,
 }
 
@@ -187,9 +236,14 @@ pub struct CoverageSegment {
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub struct FunctionRecordHeader {
+    /// Truncated MD5 hash of the function name
     pub name_hash: u64,
+    /// Length of the instrumentation data associated with the function
     pub data_len: u32,
+    /// Function hash can be zero if the function isn't in the compiled binary - such as unused
+    /// generic functions
     pub fn_hash: u64,
+    /// Hash reference of the file the function is defined in
     pub filenames_ref: u64,
 }
 
