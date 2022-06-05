@@ -60,3 +60,21 @@ jobs:
           components: llvm-tools-preview
       - name: test
         run: cargo test
+  mac:
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        version:
+          - nightly
+        target:
+          - x86_64-apple-darwin	
+      fail-fast: false
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ matrix.version }}
+          override: true
+          components: llvm-tools-preview
+      - name: test
+        run: cargo test
