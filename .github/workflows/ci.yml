@@ -4,6 +4,7 @@ on:
     branches:
       - "*"
   pull_request:
+
 jobs:
   linux:
     runs-on: ubuntu-latest
