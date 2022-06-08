@@ -500,7 +500,13 @@ fn parse_profile_names<'data, 'file>(
     version: u64,
 ) -> Result<Vec<PathBuf>, SectionReadError> {
     if let Ok(data) = section.data() {
-        let (bytes, res) = parse_path_list(data, version).unwrap();
+        let mut bytes = &data[..];
+        let mut res = vec![];
+        while !bytes.is_empty() {
+            let (new_bytes, string) = parse_string_ref(bytes).unwrap();
+            bytes = new_bytes;
+            res.push(string);
+        }
         Ok(res)
     } else {
         Err(SectionReadError::EmptySection(LlvmSection::ProfileNames))
