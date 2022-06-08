@@ -33,7 +33,7 @@ pub fn parse_path_list(input: &[u8], version: u64) -> IResult<&[u8], Vec<PathBuf
 
     if version < 3 {
         // read_uncompressed
-        let (input, values) = parse_uncompressed_list(input, list_length, version)?;
+        let (input, values) = parse_uncompressed_file_list(input, list_length, version)?;
         Ok((input, values))
     } else {
         let (input, uncompressed_size) = parse_leb128(input)?;
@@ -43,32 +43,31 @@ pub fn parse_path_list(input: &[u8], version: u64) -> IResult<&[u8], Vec<PathBuf
         let uncompressed_size = uncompressed_size as usize;
 
         if compressed_size == 0 {
-            let (input, values) = parse_uncompressed_list(input, list_length, version)?;
+            let (input, values) = parse_uncompressed_file_list(input, list_length, version)?;
             Ok((input, values))
         } else {
             let mut decoder = ZlibDecoder::new(&input[..compressed_size]);
             let mut output = vec![];
             output.reserve(uncompressed_size);
             decoder.read_to_end(&mut output).unwrap();
-            let (compressed_input, values) =
-                match parse_uncompressed_list(&output[..], list_length, version) {
-                    Ok((i, v)) => (i, v),
-                    Err(e) => {
-                        // substitute the decompressed slice start as the error location
-                        let e = match e {
-                            nom::Err::Error(e) => nom::Err::Error(Error {
-                                input,
-                                code: e.code,
-                            }),
-                            nom::Err::Failure(e) => nom::Err::Failure(Error {
-                                input,
-                                code: e.code,
-                            }),
-                            nom::Err::Incomplete(n) => nom::Err::Incomplete(n),
-                        };
-                        return Err(e);
-                    }
-                };
+            let (compressed_input, values) = match parse_uncompressed_string_list(&output[..]) {
+                Ok((i, v)) => (i, v.iter().map(PathBuf::from).collect()),
+                Err(e) => {
+                    // substitute the decompressed slice start as the error location
+                    let e = match e {
+                        nom::Err::Error(e) => nom::Err::Error(Error {
+                            input,
+                            code: e.code,
+                        }),
+                        nom::Err::Failure(e) => nom::Err::Failure(Error {
+                            input,
+                            code: e.code,
+                        }),
+                        nom::Err::Incomplete(n) => nom::Err::Incomplete(n),
+                    };
+                    return Err(e);
+                }
+            };
             Ok((&input[compressed_size..], values))
         }
     }
@@ -81,7 +80,7 @@ fn read_string(bytes: &[u8]) -> IResult<&[u8], String> {
     Ok((&bytes[len..], string))
 }
 
-fn parse_uncompressed_list(
+fn parse_uncompressed_file_list(
     mut input: &[u8],
     list_length: u64,
     version: u64,
@@ -112,4 +111,17 @@ fn parse_uncompressed_list(
         }
         Ok((input, res))
     }
+}
+
+fn parse_uncompressed_string_list(mut input: &[u8]) -> IResult<&[u8], Vec<String>> {
+    let mut res = vec![];
+    while !input.is_empty() {
+        let (bytes, len) = parse_leb128(input)?;
+        let len = len as usize;
+        let string = String::from_utf8_lossy(&bytes[..len]).to_string();
+        res.push(string);
+
+        input = &bytes[len..];
+    }
+    Ok((input, res))
 }
