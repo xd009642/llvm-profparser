@@ -8,11 +8,11 @@ pub mod reporting;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct CoverageMappingInfo {
-    pub cov_map: HashMap<u64, Vec<String>>,
+    pub cov_map: HashMap<u64, Vec<PathBuf>>,
     pub cov_fun: Vec<FunctionRecordV3>,
-    pub prof_names: Vec<String>,
-    pub prof_counts: Vec<u64>,
-    pub prof_data: Vec<ProfileData>,
+    pub prof_names: Vec<PathBuf>,
+    pub prof_counts: Option<Vec<u64>>,
+    pub prof_data: Option<Vec<ProfileData>>,
 }
 
 impl CoverageMappingInfo {
@@ -21,7 +21,7 @@ impl CoverageMappingInfo {
         let mut paths = vec![];
         if let Some(v) = self.cov_map.get(&id) {
             let mut last_absolute = None;
-            for path in v.iter().map(PathBuf::from) {
+            for path in v.iter() {
                 if path.is_absolute() {
                     // Currently all examples I've checked have the base path as first arg and any
                     // paths not in that directory are an absolute path. Now thread/local.rs in the
