@@ -505,7 +505,7 @@ fn parse_profile_names<'data, 'file>(
         while !bytes.is_empty() {
             let (new_bytes, string) = parse_string_ref(bytes).unwrap();
             bytes = new_bytes;
-            res.push(string);
+            res.push(PathBuf::from(string));
         }
         Ok(res)
     } else {
