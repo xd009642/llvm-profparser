@@ -10,7 +10,7 @@ pub mod reporting;
 pub struct CoverageMappingInfo {
     pub cov_map: HashMap<u64, Vec<PathBuf>>,
     pub cov_fun: Vec<FunctionRecordV3>,
-    pub prof_names: Vec<PathBuf>,
+    pub prof_names: Vec<String>,
     pub prof_counts: Option<Vec<u64>>,
     pub prof_data: Option<Vec<ProfileData>>,
 }

@@ -498,14 +498,14 @@ fn parse_profile_counters<'data, 'file>(
 fn parse_profile_names<'data, 'file>(
     section: &Section<'data, 'file>,
     version: u64,
-) -> Result<Vec<PathBuf>, SectionReadError> {
+) -> Result<Vec<String>, SectionReadError> {
     if let Ok(data) = section.data() {
         let mut bytes = &data[..];
         let mut res = vec![];
         while !bytes.is_empty() {
             let (new_bytes, string) = parse_string_ref(bytes).unwrap();
             bytes = new_bytes;
-            res.push(PathBuf::from(string));
+            res.push(string);
         }
         Ok(res)
     } else {
