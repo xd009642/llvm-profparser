@@ -71,12 +71,6 @@ pub fn read_object_file(
         .map(|x| parse_coverage_mapping(object_file.endianness(), &x, version))
         .ok_or(SectionReadError::MissingSection(LlvmSection::CoverageMap))??;
 
-    let prof_names = object_file
-        .section_by_name("__llvm_prf_names")
-        .or(object_file.section_by_name(".lprfn"))
-        .map(|x| parse_profile_names(&x))
-        .ok_or(SectionReadError::MissingSection(LlvmSection::ProfileNames))??;
-
     let prof_counts = object_file
         .section_by_name("__llvm_prf_cnts")
         .or(object_file.section_by_name(".lprfc"))
@@ -92,7 +86,6 @@ pub fn read_object_file(
     Ok(CoverageMappingInfo {
         cov_map,
         cov_fun,
-        prof_names,
         prof_counts,
         prof_data,
     })
@@ -492,23 +485,6 @@ fn parse_profile_counters<'data, 'file>(
         Ok(result)
     } else {
         Err(SectionReadError::EmptySection(LlvmSection::ProfileCounts))
-    }
-}
-
-fn parse_profile_names<'data, 'file>(
-    section: &Section<'data, 'file>,
-) -> Result<Vec<String>, SectionReadError> {
-    if let Ok(data) = section.data() {
-        let mut bytes = &data[..];
-        let mut res = vec![];
-        while !bytes.is_empty() {
-            let (new_bytes, string) = parse_string_ref(bytes).unwrap();
-            bytes = new_bytes;
-            res.push(string);
-        }
-        Ok(res)
-    } else {
-        Err(SectionReadError::EmptySection(LlvmSection::ProfileNames))
     }
 }
 

@@ -28,7 +28,7 @@ impl ValueKind {
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Ord, PartialOrd, Hash)]
 pub struct Symtab {
-    pub names: BTreeMap<u64, String>,
+    pub(crate) names: BTreeMap<u64, String>,
 }
 
 pub fn compute_hash(data: impl AsRef<[u8]>) -> u64 {
