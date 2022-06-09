@@ -96,8 +96,9 @@ fn parse_uncompressed_file_list(
     } else {
         let (bytes, cwd) = read_string(input)?;
         let cwd = Path::new(&cwd);
+        res.push(cwd.to_path_buf());
         input = bytes;
-        for _ in 0..list_length {
+        for _ in 1..list_length {
             let (bytes, path) = read_string(input)?;
             input = bytes;
             let tmp = Path::new(&path);
