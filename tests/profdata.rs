@@ -102,6 +102,8 @@ fn check_command(ext: &OsStr) {
 
             assert_eq!(get_printout(&llvm.stdout), get_printout(&rust.stdout));
             assert_eq!(get_printout(&llvm.stderr), get_printout(&rust.stderr));
+        } else {
+            println!("LLVM tools failed:\n{}", String::from_utf8_lossy(&llvm.stderr));
         }
     }
     if count == 0 {
