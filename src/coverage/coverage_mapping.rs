@@ -145,7 +145,7 @@ impl<'a> CoverageMapping<'a> {
 
                     let result = report
                         .files
-                        .entry(paths[region.expanded_file_id].clone())
+                        .entry(paths[region.file_id].clone())
                         .or_default();
                     result.insert(region.loc.clone(), count as usize);
                 }
@@ -173,7 +173,7 @@ impl<'a> CoverageMapping<'a> {
                             }) {
                                 let result = report
                                     .files
-                                    .entry(paths[expr_region.expanded_file_id].clone())
+                                    .entry(paths[expr_region.file_id].clone())
                                     .or_default();
                                 result.insert(expr_region.loc.clone(), count as _);
                             }
@@ -225,7 +225,7 @@ impl<'a> CoverageMapping<'a> {
                             }) {
                                 let result = report
                                     .files
-                                    .entry(paths[expr_region.expanded_file_id].clone())
+                                    .entry(paths[expr_region.file_id].clone())
                                     .or_default();
                                 result.insert(expr_region.loc.clone(), count as _);
                             }
