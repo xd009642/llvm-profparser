@@ -74,7 +74,7 @@ pub fn read_object_file(
     let prof_names = object_file
         .section_by_name("__llvm_prf_names")
         .or(object_file.section_by_name(".lprfn"))
-        .map(|x| parse_profile_names(&x, version))
+        .map(|x| parse_profile_names(&x))
         .ok_or(SectionReadError::MissingSection(LlvmSection::ProfileNames))??;
 
     let prof_counts = object_file
@@ -497,7 +497,6 @@ fn parse_profile_counters<'data, 'file>(
 
 fn parse_profile_names<'data, 'file>(
     section: &Section<'data, 'file>,
-    version: u64,
 ) -> Result<Vec<String>, SectionReadError> {
     if let Ok(data) = section.data() {
         let mut bytes = &data[..];
