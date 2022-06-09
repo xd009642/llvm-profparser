@@ -65,6 +65,12 @@ pub struct Header {
     pub value_kind_last: u64,
 }
 
+impl Header {
+    fn has_byte_coverage(&self) -> bool {
+        (self.version & VARIANT_MASK_BYTE_COVERAGE) != 0
+    }
+}
+
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub struct ProfileData<T> {
     name_ref: u64,
@@ -174,6 +180,11 @@ where
             for _ in 0..(data.num_counters as usize) {
                 let (b, counter) = nom_u64(header.endianness)(bytes)?;
                 bytes = b;
+                if header.has_byte_coverage() {
+                    (counter == 0) as u64
+                } else {
+                    counter
+                };
                 counts.push(counter);
             }
             let record = InstrProfRecord {
@@ -218,7 +229,7 @@ where
             result.is_ir = (header.version & VARIANT_MASK_IR_PROF) != 0;
             result.has_csir = (header.version & VARIANT_MASK_CSIR_PROF) != 0;
             if version_num > 7 {
-                result.is_byte_coverage = (header.version & VARIANT_MASK_BYTE_COVERAGE) != 0;
+                result.is_byte_coverage = header.has_byte_coverage();
                 result.fn_entry_only = (header.version & VARIANT_MASK_FUNCTION_ENTRY_ONLY) != 0;
             }
             input = &bytes[(header.binary_ids_len as usize)..];
