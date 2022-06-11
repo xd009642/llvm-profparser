@@ -255,7 +255,7 @@ where
                 let (new_bytes, names) = parse_string_ref(input)?;
                 input = new_bytes;
                 for name in names.split(INSTR_PROF_NAME_SEP) {
-                    symtab.add_func_name(name.to_string());
+                    symtab.add_func_name(name.to_string(), Some(header.endianness));
                 }
             }
             let padding = get_num_padding_bytes(header.names_len);
@@ -265,7 +265,7 @@ where
                 let (bytes, _) =
                     Self::read_value_profiling_data(&header, &data, input, &mut record)?;
                 input = bytes;
-                let name = symtab.names.get(&data.name_ref).cloned(); // TODO are name_ref and func_hash right on data?
+                let name = symtab.names.get(&data.name_ref).cloned();
                 let hash = if name.is_some() {
                     Some(data.func_hash)
                 } else {

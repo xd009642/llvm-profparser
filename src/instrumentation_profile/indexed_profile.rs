@@ -1,7 +1,10 @@
 use crate::hash_table::*;
 use crate::instrumentation_profile::*;
 use crate::summary::*;
-use nom::{number::complete::*, IResult};
+use nom::{
+    number::{complete::*, Endianness},
+    IResult,
+};
 use num_enum::TryFromPrimitive;
 use std::collections::HashMap;
 use std::convert::TryFrom;
@@ -147,7 +150,9 @@ impl InstrProfReader for IndexedInstrProf {
         input = bytes;
         for ((hash, name), v) in &table.0 {
             let name = name.to_string();
-            profile.symtab.add_func_name(name.clone(), None);
+            profile
+                .symtab
+                .add_func_name(name.clone(), Some(Endianness::Little));
             let record = NamedInstrProfRecord {
                 name: Some(name),
                 hash: Some(*hash),

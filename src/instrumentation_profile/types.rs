@@ -1,3 +1,4 @@
+use nom::number::Endianness;
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use std::convert::TryInto;
@@ -33,7 +34,12 @@ pub struct Symtab {
 
 pub fn compute_hash(data: impl AsRef<[u8]>) -> u64 {
     let hash = md5::compute(data).0[..8].try_into().unwrap_or_default();
-    u64::from_ne_bytes(hash)
+    u64::from_le_bytes(hash)
+}
+
+fn compute_be_hash(data: impl AsRef<[u8]>) -> u64 {
+    let hash = md5::compute(data).0[..8].try_into().unwrap_or_default();
+    u64::from_be_bytes(hash)
 }
 
 impl Symtab {
@@ -41,8 +47,16 @@ impl Symtab {
         self.names.len()
     }
 
-    pub fn add_func_name(&mut self, name: String) {
-        let hash = compute_hash(&name);
+    /// Some formats such as the Raw profiles have configurable endianness. I think these may
+    /// require a matching endian hash. However, this doesn't seem to be represented in any of the
+    /// llvm test files so is largely a mystery. Computes a little endian hash unless specified
+    /// otherwise.
+    pub fn add_func_name(&mut self, name: String, endianness: Option<Endianness>) {
+        let hash = match endianness {
+            Some(Endianness::Little) => compute_hash(&name),
+            Some(Endianness::Big) => compute_be_hash(&name),
+            _ => compute_hash(&name),
+        };
         self.names.insert(hash, name);
     }
 
@@ -52,6 +66,10 @@ impl Symtab {
 
     pub fn get(&self, hash: u64) -> Option<&String> {
         self.names.get(&hash)
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = (&u64, &String)> {
+        self.names.iter()
     }
 }
 
