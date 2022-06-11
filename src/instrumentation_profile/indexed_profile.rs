@@ -147,7 +147,7 @@ impl InstrProfReader for IndexedInstrProf {
         input = bytes;
         for ((hash, name), v) in &table.0 {
             let name = name.to_string();
-            profile.symtab.names.insert(*hash, name.clone());
+            profile.symtab.add_func_name(name.clone(), None);
             let record = NamedInstrProfRecord {
                 name: Some(name),
                 hash: Some(*hash),
