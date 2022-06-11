@@ -50,7 +50,7 @@ pub fn parse_path_list(input: &[u8], version: u64) -> IResult<&[u8], Vec<PathBuf
             let mut output = vec![];
             output.reserve(uncompressed_size);
             decoder.read_to_end(&mut output).unwrap();
-            let (compressed_input, values) = match parse_uncompressed_string_list(&output[..]) {
+            let (_compressed_input, values) = match parse_uncompressed_string_list(&output[..]) {
                 Ok((i, v)) => (i, v.iter().map(PathBuf::from).collect()),
                 Err(e) => {
                     // substitute the decompressed slice start as the error location
