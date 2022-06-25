@@ -300,8 +300,11 @@ where
             let mut total_offset = 0;
             let remaining_before_counters = input.len();
             for data in &data_section {
-                let counters_offset =
-                    (data.counter_ptr.into() as i64 - counters_delta as i64) - total_offset;
+                let counters_offset = if header.version() > 5 {
+                    (data.counter_ptr.into() as i64 - counters_delta as i64) - total_offset
+                } else {
+                    0
+                };
                 let (bytes, record) = Self::read_raw_counts(&header, data, counters_offset, input)?;
                 total_offset +=
                     counters_offset + (record.counts.len() * header.counter_size()) as i64;
