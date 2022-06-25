@@ -13,15 +13,15 @@ fn data_root_dir() -> PathBuf {
 fn get_data_dir() -> PathBuf {
     cfg_if::cfg_if! {
         if #[cfg(llvm_11)] {
-            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/profdata/llvm-11")
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests").join("data").join("profdata").join("llvm-11")
         } else if #[cfg(llvm_12)] {
-            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/profdata/llvm-12")
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests").join("data").join("profdata").join("llvm-12")
         } else if #[cfg(llvm_13)] {
-            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/profdata/llvm-13")
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests").join("data").join("profdata").join("llvm-13")
         } else if #[cfg(llvm_14)] {
-            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/profdata/llvm-14")
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests").join("data").join("profdata").join("llvm-14")
         } else if #[cfg(llvm_15)] {
-            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/profdata/llvm-14")
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests").join("data").join("profdata").join("llvm-15")
         } else {
             data_root_dir()
         }
@@ -208,8 +208,8 @@ fn merge() {
 
 #[test]
 fn check_raw_data_consistency() {
-    let raw = data_root_dir().join("misc/stable.profraw");
-    let data = data_root_dir().join("misc/stable.profdata");
+    let raw = data_root_dir().join("misc").join("stable.profraw");
+    let data = data_root_dir().join("misc").join("stable.profdata");
 
     let raw = merge_profiles(&[raw]).unwrap();
     let data = merge_profiles(&[data]).unwrap();
