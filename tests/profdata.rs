@@ -6,6 +6,10 @@ use std::fs::read_dir;
 use std::path::PathBuf;
 use std::process::Command;
 
+fn data_root_dir() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/profdata")
+}
+
 fn get_data_dir() -> PathBuf {
     cfg_if::cfg_if! {
         if #[cfg(llvm_11)] {
@@ -19,7 +23,7 @@ fn get_data_dir() -> PathBuf {
         } else if #[cfg(llvm_15)] {
             PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/profdata/llvm-14")
         } else {
-            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/profdata")
+            data_root_dir()
         }
     }
 }
@@ -198,4 +202,23 @@ fn merge() {
     ];
 
     check_merge_command(&files, "foo_results");
+}
+
+#[test]
+fn check_raw_data_consistency() {
+    let raw = data_root_dir().join("misc/stable.profraw");
+    let data = data_root_dir().join("misc/stable.profdata");
+
+    let raw = merge_profiles(&[raw]).unwrap();
+    let data = merge_profiles(&[data]).unwrap();
+
+    // Merged with sparse so need to filter out some records
+    for (hash, name) in data.symtab.iter() {
+        println!("Seeing if {}:{} in Raw", hash, name);
+        std::assert_eq!(name, raw.symtab.get(*hash).unwrap());
+
+        let data_record = data.get_record(&name);
+        let raw_record = raw.get_record(&name);
+        std::assert_eq!(data_record, raw_record);
+    }
 }

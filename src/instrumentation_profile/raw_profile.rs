@@ -66,8 +66,43 @@ pub struct Header {
 }
 
 impl Header {
+    #[inline(always)]
+    fn version(&self) -> u64 {
+        self.version & !VARIANT_MASKS_ALL
+    }
+
+    #[inline(always)]
     fn has_byte_coverage(&self) -> bool {
         (self.version & VARIANT_MASK_BYTE_COVERAGE) != 0
+    }
+
+    #[inline(always)]
+    fn ir_profile(&self) -> bool {
+        (self.version & VARIANT_MASK_IR_PROF) != 0
+    }
+
+    #[inline(always)]
+    fn csir_profile(&self) -> bool {
+        (self.version & VARIANT_MASK_CSIR_PROF) != 0
+    }
+
+    #[inline(always)]
+    fn function_entry_only(&self) -> bool {
+        (self.version & VARIANT_MASK_FUNCTION_ENTRY_ONLY) != 0
+    }
+
+    #[inline(always)]
+    fn memory_profile(&self) -> bool {
+        (self.version & VARIANT_MASK_MEMORY_PROFILE) != 0
+    }
+
+    #[inline(always)]
+    fn counter_size(&self) -> usize {
+        if self.has_byte_coverage() {
+            1
+        } else {
+            8
+        }
     }
 }
 
@@ -81,6 +116,12 @@ pub struct ProfileData<T> {
     num_counters: u32,
     /// This might just be two values?
     num_value_sites: [u16; ValueKind::MemOpSize as usize + 1],
+}
+
+impl<T> ProfileData<T> {
+    fn len(&self) -> usize {
+        16 + 4 + (2 * (ValueKind::MemOpSize as usize + 1)) + 3 * size_of::<T>()
+    }
 }
 
 impl Header {
@@ -159,15 +200,16 @@ where
     fn read_raw_counts<'a>(
         header: &Header,
         data: &ProfileData<T>,
+        counter_offset: i64,
         mut bytes: &'a [u8],
     ) -> IResult<&'a [u8], InstrProfRecord> {
         let max_counters = header.max_counters_len();
-        let counter_offset = (data.counter_ptr.into() as i64 - header.counters_delta as i64)
-            / size_of::<u64>() as i64;
         // From LLVM coverage mapping version 8 relative counter offsets are allowed which can be
         // signed
         if data.num_counters == 0
             || max_counters < 0
+            || counter_offset < 0
+            || counter_offset as u64 >= header.counters_len
             || data.num_counters as i64 > max_counters
             || (header.version < 8 && counter_offset < 0)
             || counter_offset > max_counters
@@ -177,12 +219,15 @@ where
         } else {
             let mut counts = Vec::<u64>::new();
             counts.reserve(data.num_counters as usize);
+            bytes = &bytes[(counter_offset as usize)..];
             for _ in 0..(data.num_counters as usize) {
-                let (b, counter) = nom_u64(header.endianness)(bytes)?;
-                bytes = b;
-                if header.has_byte_coverage() {
+                let counter = if header.has_byte_coverage() {
+                    let counter = bytes[0];
+                    bytes = &bytes[1..];
                     (counter == 0) as u64
                 } else {
+                    let (b, counter) = nom_u64(header.endianness)(bytes)?;
+                    bytes = b;
                     counter
                 };
                 counts.push(counter);
@@ -224,13 +269,14 @@ where
             let mut result = InstrumentationProfile::default();
             let (bytes, header) = Self::parse_header(input)?;
             // LLVM 11 and 12 are version 5. LLVM 13 is version 7
-            let version_num = header.version & !VARIANT_MASKS_ALL;
+            let version_num = header.version();
             result.version = Some(version_num);
-            result.is_ir = (header.version & VARIANT_MASK_IR_PROF) != 0;
-            result.has_csir = (header.version & VARIANT_MASK_CSIR_PROF) != 0;
+            result.is_ir = header.ir_profile();
+            result.has_csir = header.csir_profile();
             if version_num > 7 {
                 result.is_byte_coverage = header.has_byte_coverage();
-                result.fn_entry_only = (header.version & VARIANT_MASK_FUNCTION_ENTRY_ONLY) != 0;
+                result.fn_entry_only = header.function_entry_only();
+                result.memory_profiling = header.memory_profile();
             }
             input = &bytes[(header.binary_ids_len as usize)..];
             let mut data_section = vec![];
@@ -242,12 +288,31 @@ where
             let (bytes, _) = take(header.padding_bytes_before_counters)(input)?;
             input = bytes;
             let mut counters = vec![];
+            let mut counters_delta = header.counters_delta;
+
+            // Okay so the counters section looks a bit hairy. So as a brief explanation.
+            // 1. The base offset is from CountersStart pointer to entry of the record. Meaning
+            //    doing a nom type parsing we need to keep track of the total offset as counter
+            //    records can be offset in the middle of the counter list.
+            // 2. Also there may be some padding bytes before the last counter and end of counters
+            //    section. This needs to be applied as well as padding_bytes_after_counters for
+            //    total padding
+            let mut total_offset = 0;
+            let remaining_before_counters = input.len();
             for data in &data_section {
-                let (bytes, record) = Self::read_raw_counts(&header, data, input)?;
+                let counters_offset =
+                    (data.counter_ptr.into() as i64 - counters_delta as i64) - total_offset;
+                let (bytes, record) = Self::read_raw_counts(&header, data, counters_offset, input)?;
+                total_offset +=
+                    counters_offset + (record.counts.len() * header.counter_size()) as i64;
+                counters_delta -= data.len() as u64;
                 counters.push(record);
                 input = bytes;
             }
-            let (bytes, _) = take(header.padding_bytes_after_counters)(input)?;
+            let counters_end = header.padding_bytes_after_counters as usize
+                + (header.counters_len as usize * header.counter_size())
+                - (remaining_before_counters - input.len());
+            let (bytes, _) = take(counters_end)(input)?;
             input = bytes;
             let end_length = input.len() - header.names_len as usize;
             let mut symtab = Symtab::default();
