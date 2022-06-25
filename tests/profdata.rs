@@ -83,6 +83,7 @@ fn check_command(ext: &OsStr) {
         .filter_map(|x| x.ok())
         .filter(|x| x.path().extension().unwrap_or_default() == ext)
     {
+        println!("{:?}", raw_file.file_name());
         // llvm-profdata won't be able to work on all the files as it depends on what the host OS
         // llvm comes with by default. So first we check if it works and if so we test
         let llvm = Command::new("cargo")
@@ -126,6 +127,7 @@ fn check_against_text(ext: &OsStr) {
         .filter_map(|x| x.ok())
         .filter(|x| x.path().extension().unwrap_or_default() == ext)
     {
+        println!("{:?}", raw_file.file_name());
         let llvm = Command::new("cargo")
             .current_dir(&data)
             .args(&[
