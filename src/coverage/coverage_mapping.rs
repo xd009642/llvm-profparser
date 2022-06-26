@@ -131,7 +131,7 @@ impl<'a> CoverageMapping<'a> {
                             .counts()
                             .get(region.count.id as usize)
                             .copied()
-                            .unwrap_or_default(),
+                            .unwrap_or_default() as i64,
                         None => 0,
                     };
                     region_ids.insert(region.count.clone(), count);
