@@ -70,7 +70,7 @@ fn strip_whitespace(s: &[u8]) -> IResult<&[u8], ()> {
 fn strip_comments(s: &[u8]) -> IResult<&[u8], ()> {
     delimited(
         tag(b"#"),
-        alt((take_until("\n"), take_until("\r"))),
+        alt((take_until("\r"), take_until("\n"))),
         line_ending,
     )(s)
     .map(|(b, _)| (b, ()))
@@ -86,8 +86,8 @@ fn match_header_tags(s: &[u8]) -> IResult<&[u8], &[u8]> {
         tag_no_case(FE_TAG),
         tag_no_case(CSIR_TAG),
         tag_no_case(ENTRY_TAG),
-        take_until("\n"),
         take_until("\r"),
+        take_until("\n"),
     ))(s)
 }
 
