@@ -6,30 +6,26 @@ use std::fs::read_dir;
 use std::path::PathBuf;
 use std::process::Command;
 
-#[cfg(llvm_11)]
-fn get_data_dir() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/profdata/llvm-11")
-}
-
-#[cfg(llvm_12)]
-fn get_data_dir() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/profdata/llvm-12")
-}
-
-#[cfg(llvm_13)]
-fn get_data_dir() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/profdata/llvm-13")
-}
-
-#[cfg(llvm_14)]
-fn get_data_dir() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/profdata/llvm-14")
-}
-
-#[cfg(not(any(llvm_11, llvm_12, llvm_13, llvm_14)))]
-fn get_data_dir() -> PathBuf {
-    // Nothing to do so lets get a directory with nothing in
+fn data_root_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/profdata")
+}
+
+fn get_data_dir() -> PathBuf {
+    cfg_if::cfg_if! {
+        if #[cfg(llvm_11)] {
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests").join("data").join("profdata").join("llvm-11")
+        } else if #[cfg(llvm_12)] {
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests").join("data").join("profdata").join("llvm-12")
+        } else if #[cfg(llvm_13)] {
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests").join("data").join("profdata").join("llvm-13")
+        } else if #[cfg(llvm_14)] {
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests").join("data").join("profdata").join("llvm-14")
+        } else if #[cfg(llvm_15)] {
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests").join("data").join("profdata").join("llvm-15")
+        } else {
+            data_root_dir()
+        }
+    }
 }
 
 fn get_printout(output: &[u8]) -> Vec<String> {
@@ -87,6 +83,7 @@ fn check_command(ext: &OsStr) {
         .filter_map(|x| x.ok())
         .filter(|x| x.path().extension().unwrap_or_default() == ext)
     {
+        println!("{:?}", raw_file.file_name());
         // llvm-profdata won't be able to work on all the files as it depends on what the host OS
         // llvm comes with by default. So first we check if it works and if so we test
         let llvm = Command::new("cargo")
@@ -110,6 +107,11 @@ fn check_command(ext: &OsStr) {
 
             assert_eq!(get_printout(&llvm.stdout), get_printout(&rust.stdout));
             assert_eq!(get_printout(&llvm.stderr), get_printout(&rust.stderr));
+        } else {
+            println!(
+                "LLVM tools failed:\n{}",
+                String::from_utf8_lossy(&llvm.stderr)
+            );
         }
     }
     if count == 0 {
@@ -125,6 +127,7 @@ fn check_against_text(ext: &OsStr) {
         .filter_map(|x| x.ok())
         .filter(|x| x.path().extension().unwrap_or_default() == ext)
     {
+        println!("{:?}", raw_file.file_name());
         let llvm = Command::new("cargo")
             .current_dir(&data)
             .args(&[
@@ -201,4 +204,23 @@ fn merge() {
     ];
 
     check_merge_command(&files, "foo_results");
+}
+
+#[test]
+fn check_raw_data_consistency() {
+    let raw = data_root_dir().join("misc").join("stable.profraw");
+    let data = data_root_dir().join("misc").join("stable.profdata");
+
+    let raw = merge_profiles(&[raw]).unwrap();
+    let data = merge_profiles(&[data]).unwrap();
+
+    // Merged with sparse so need to filter out some records
+    for (hash, name) in data.symtab.iter() {
+        println!("Seeing if {}:{} in Raw", hash, name);
+        std::assert_eq!(name, raw.symtab.get(*hash).unwrap());
+
+        let data_record = data.get_record(&name);
+        let raw_record = raw.get_record(&name);
+        std::assert_eq!(data_record, raw_record);
+    }
 }

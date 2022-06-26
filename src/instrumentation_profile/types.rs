@@ -1,3 +1,4 @@
+use nom::number::Endianness;
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use std::convert::TryInto;
@@ -13,6 +14,8 @@ pub(crate) const VARIANT_MASK_CSIR_PROF: u64 = 1u64 << 57;
 pub(crate) const VARIANT_MASK_BYTE_COVERAGE: u64 = 1u64 << 60;
 /// This is taken from `llvm/include/llvm/ProfileData/InstrProfileData.inc`
 pub(crate) const VARIANT_MASK_FUNCTION_ENTRY_ONLY: u64 = 1u64 << 61;
+/// This is taken from `llvm/include/llvm/ProfileData/InstrProfileData.inc`
+pub(crate) const VARIANT_MASK_MEMORY_PROFILE: u64 = 1u64 << 62;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Ord, PartialOrd, Hash)]
 pub enum ValueKind {
@@ -33,7 +36,12 @@ pub struct Symtab {
 
 pub fn compute_hash(data: impl AsRef<[u8]>) -> u64 {
     let hash = md5::compute(data).0[..8].try_into().unwrap_or_default();
-    u64::from_ne_bytes(hash)
+    u64::from_le_bytes(hash)
+}
+
+fn compute_be_hash(data: impl AsRef<[u8]>) -> u64 {
+    let hash = md5::compute(data).0[..8].try_into().unwrap_or_default();
+    u64::from_be_bytes(hash)
 }
 
 impl Symtab {
@@ -41,8 +49,16 @@ impl Symtab {
         self.names.len()
     }
 
-    pub fn add_func_name(&mut self, name: String) {
-        let hash = compute_hash(&name);
+    /// Some formats such as the Raw profiles have configurable endianness. I think these may
+    /// require a matching endian hash. However, this doesn't seem to be represented in any of the
+    /// llvm test files so is largely a mystery. Computes a little endian hash unless specified
+    /// otherwise.
+    pub fn add_func_name(&mut self, name: String, endianness: Option<Endianness>) {
+        let hash = match endianness {
+            Some(Endianness::Little) => compute_hash(&name),
+            Some(Endianness::Big) => compute_be_hash(&name),
+            _ => compute_hash(&name),
+        };
         self.names.insert(hash, name);
     }
 
@@ -52,6 +68,10 @@ impl Symtab {
 
     pub fn get(&self, hash: u64) -> Option<&String> {
         self.names.get(&hash)
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = (&u64, &String)> {
+        self.names.iter()
     }
 }
 
@@ -78,6 +98,7 @@ pub struct InstrumentationProfile {
     pub(crate) is_entry_first: bool,
     pub(crate) is_byte_coverage: bool,
     pub(crate) fn_entry_only: bool,
+    pub(crate) memory_profiling: bool,
     pub records: Vec<NamedInstrProfRecord>,
     pub symtab: Symtab,
 }
@@ -101,6 +122,10 @@ impl InstrumentationProfile {
 
     pub fn is_entry_first(&self) -> bool {
         self.is_entry_first
+    }
+
+    pub fn has_memory_profile(&self) -> bool {
+        self.memory_profiling
     }
 
     pub fn get_level(&self) -> InstrumentationLevel {
@@ -141,6 +166,12 @@ impl InstrumentationProfile {
                 .insert(record.hash_unchecked(), record.name_unchecked());
             self.records.push(record.clone());
         }
+    }
+
+    pub fn get_record(&self, name: &str) -> Option<&NamedInstrProfRecord> {
+        self.records
+            .iter()
+            .find(|x| x.name.as_deref() == Some(name))
     }
 }
 

@@ -217,10 +217,14 @@ fn check_mapping_consistency() {
         //      mapping_info.prof_data
     }
 
-    let expected_len = info
-        .prof_data
-        .iter()
-        .map(|x| x.counters_len as usize)
-        .sum::<usize>();
-    assert_eq!(expected_len, info.prof_counts.len());
+    if let Some(counts) = info.prof_counts.as_ref().map(|x| x.len()) {
+        let expected_len = info
+            .prof_data
+            .as_ref()
+            .unwrap()
+            .iter()
+            .map(|x| x.counters_len as usize)
+            .sum::<usize>();
+        assert_eq!(expected_len, counts);
+    }
 }

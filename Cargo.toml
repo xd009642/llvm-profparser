@@ -1,6 +1,6 @@
 [package]
 name = "llvm_profparser"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["xd009642 <danielmckenna93@gmail.com>"]
 description = "Parsing and interpretation of llvm coverage profiles and generated data"
 repository = "https://github.com/xd009642/llvm-profparser"
@@ -18,7 +18,7 @@ cli = ["structopt"]
 
 [dependencies]
 flate2 = "1.0"
-indexmap = "1.8.0"
+indexmap = "~1.8"
 leb128 = "0.2.4"
 nom = "7.0.0"
 num_enum = "0.5.1"
@@ -30,6 +30,7 @@ thiserror = "1.0.30"
 [dev-dependencies]
 assert_cmd = "2"
 cargo_metadata = "0.14.2"
+cfg-if = "1.0.0"
 pretty_assertions = "0.7"
 regex = "1.5.6"
 
