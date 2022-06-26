@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Counter offsetting in raw profiles now implemented
 - Counter size for byte coverage now correct
+- Text profile now handles carriage returns
 
 ## [0.0.1] - 2022-06-05
 ### Added
