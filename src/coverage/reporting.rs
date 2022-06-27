@@ -39,7 +39,7 @@ impl CoverageResult {
     pub fn insert(&mut self, loc: SourceLocation, count: usize) {
         self.hits
             .entry(loc)
-            .and_modify(|x| *x += count)
+            .and_modify(|x| *x = x.saturating_add(count))
             .or_insert(count);
     }
 

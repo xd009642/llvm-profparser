@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Changed
 - Made instrumentation profile parsing failure message more serious
+- Made hit adding in report use `saturating_add` to prevent overflow
 
 ### Fixed
 - Make counter value signed when tracking expressions to prevent underflow
