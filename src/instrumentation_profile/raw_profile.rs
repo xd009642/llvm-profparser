@@ -206,10 +206,11 @@ where
         let max_counters = header.max_counters_len();
         // From LLVM coverage mapping version 8 relative counter offsets are allowed which can be
         // signed
+        // num 2 max 24 offset 7 counters len 3
         if data.num_counters == 0
             || max_counters < 0
             || counter_offset < 0
-            || counter_offset as u64 >= header.counters_len
+            || counter_offset as u64 >= (header.counters_len * header.counter_size() as u64)
             || data.num_counters as i64 > max_counters
             || (header.version < 8 && counter_offset < 0)
             || counter_offset > max_counters
