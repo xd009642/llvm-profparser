@@ -195,6 +195,7 @@ fn show_profdatas() {
 }
 
 #[test]
+#[ignore]
 fn merge() {
     let data = get_data_dir();
     let files = [
