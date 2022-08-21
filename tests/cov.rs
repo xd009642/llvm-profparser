@@ -101,7 +101,6 @@ fn run_coverage(project: &str) -> io::Result<Option<Run>> {
     let mut child = Command::new("cargo")
         .args(&["test", "--no-run", "--message-format", "json"])
         .env("RUSTFLAGS", rustflags)
-        .env("LLVM_PROFILE_FILE", "default.profraw")
         .stdout(Stdio::piped())
         .current_dir(&project)
         .spawn()?;
@@ -122,7 +121,10 @@ fn run_coverage(project: &str) -> io::Result<Option<Run>> {
     }
     let binary = binary.unwrap();
 
-    Command::new(&binary).current_dir(&project).output()?;
+    Command::new(&binary)
+        .current_dir(&project)
+        .env("LLVM_PROFILE_FILE", "default.profraw")
+        .output()?;
 
     println!("{}", binary.display());
 
