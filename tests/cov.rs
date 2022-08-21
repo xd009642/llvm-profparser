@@ -185,14 +185,20 @@ fn check_matches() {
     let profparser_report = assert_cmd::Command::cargo_bin("cov")
         .unwrap()
         .current_dir(&dir)
-        .args(&["show", "--instr-profile", "matches/merged.profdata", "--object", "matches/matches_bin"])
+        .args(&[
+            "show",
+            "--instr-profile",
+            "matches/merged.profdata",
+            "--object",
+            "matches/matches_bin",
+        ])
         .output()
         .unwrap();
-   
+
     let expected_out = fs::read(dir.join("matches/matches.stdout")).unwrap();
     let profparser = get_printout(&profparser_report.stdout);
     let baseline = get_printout(&expected_out);
-    
+
     for (baseline, me) in baseline.iter().zip(&profparser) {
         assert_eq!(baseline, me);
     }
