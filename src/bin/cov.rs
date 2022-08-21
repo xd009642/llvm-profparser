@@ -50,7 +50,6 @@ impl ShowCommand {
         for (path, result) in report.files.iter() {
             // Read file to string
             if let Ok(source) = fs::read_to_string(path) {
-                let column_width = result.max_hits().to_string().len();
                 if report.files.len() > 1 {
                     println!("{}", path.display());
                 }

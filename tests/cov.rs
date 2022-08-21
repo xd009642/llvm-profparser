@@ -4,7 +4,7 @@ use pretty_assertions::assert_eq;
 use regex::Regex;
 use std::collections::HashSet;
 use std::ffi::OsStr;
-use std::fs::read_dir;
+use std::fs::{self, read_dir};
 use std::io;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
@@ -176,6 +176,25 @@ fn compare_reports(run: &Run) {
 
     for (llvm, me) in llvm.iter().zip(&profparser) {
         assert_eq!(llvm, me);
+    }
+}
+
+#[test]
+fn check_matches() {
+    let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/");
+    let profparser_report = assert_cmd::Command::cargo_bin("cov")
+        .unwrap()
+        .current_dir(&dir)
+        .args(&["show", "--instr-profile", "matches/merged.profdata", "--object", "matches/matches_bin"])
+        .output()
+        .unwrap();
+   
+    let expected_out = fs::read(dir.join("matches/matches.stdout")).unwrap();
+    let profparser = get_printout(&profparser_report.stdout);
+    let baseline = get_printout(&expected_out);
+    
+    for (baseline, me) in baseline.iter().zip(&profparser) {
+        assert_eq!(baseline, me);
     }
 }
 
