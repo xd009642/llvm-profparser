@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Make counter value signed when tracking expressions to prevent underflow
 - Multiply max counters by counter size when comparing to counter delta
+- Fixed handling of profile instrumentation not tied to a counter with source location
 
 ## [0.1.1] - 2022-06-26
 ### Added

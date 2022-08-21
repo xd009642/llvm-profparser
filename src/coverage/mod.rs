@@ -1,3 +1,5 @@
+use crate::instrumentation_profile::types::compute_hash;
+use crate::InstrumentationProfile;
 use nom::IResult;
 use std::collections::HashMap;
 use std::convert::TryFrom;
@@ -41,6 +43,35 @@ impl CoverageMappingInfo {
             }
         }
         paths
+    }
+
+    /// All counters of type `CounterKind::ProfileInstrumentation` can be used in function regions
+    /// other than their own (particulary for functions which are only called from one location).
+    /// This gathers them all to use as a base list of counters.
+    pub(crate) fn get_simple_counters(
+        &self,
+        profile: &InstrumentationProfile,
+    ) -> HashMap<Counter, i64> {
+        let mut result = HashMap::new();
+        result.insert(Counter::default(), 0);
+        for func in &self.cov_fun {
+            let record = profile.records.iter().find(|x| {
+                x.hash == Some(func.header.fn_hash)
+                    && Some(func.header.name_hash) == x.name.as_ref().map(compute_hash)
+            });
+            for region in func.regions.iter().filter(|x| !x.count.is_expression()) {
+                let count = match record.as_ref() {
+                    Some(rec) => rec
+                        .counts()
+                        .get(region.count.id as usize)
+                        .copied()
+                        .unwrap_or_default() as i64,
+                    None => 0,
+                };
+                result.insert(region.count.clone(), count);
+            }
+        }
+        result
     }
 }
 
@@ -126,6 +157,13 @@ pub struct Counter {
 }
 
 impl Counter {
+    pub fn instrumentation(id: u64) -> Self {
+        Self {
+            kind: CounterType::ProfileInstrumentation,
+            id,
+        }
+    }
+
     pub fn is_expression(&self) -> bool {
         matches!(self.kind, CounterType::Expression(_))
     }
