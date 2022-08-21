@@ -109,33 +109,39 @@ impl<'a> CoverageMapping<'a> {
         })
     }
 
+    /// All counters of type `CounterKind::ProfileInstrumentation` can be used in function regions
+    /// other than their own (particulary for functions which are only called from one location).
+    /// This gathers them all to use as a base list of counters.
+    pub(crate) fn get_simple_counters(&self, func: &FunctionRecordV3) -> HashMap<Counter, i64> {
+        let mut result = HashMap::new();
+        result.insert(Counter::default(), 0);
+        let record = self.profile.records.iter().find(|x| {
+            x.hash == Some(func.header.fn_hash)
+                && Some(func.header.name_hash) == x.name.as_ref().map(compute_hash)
+        });
+        if let Some(func_record) = record.as_ref() {
+            for (id, count) in func_record.record.counts.iter().enumerate() {
+                result.insert(Counter::instrumentation(id as u64), *count as i64);
+            }
+        }
+        result
+    }
+
     pub fn generate_report(&self) -> CoverageReport {
         let mut report = CoverageReport::default();
+        //let base_region_ids = info.get_simple_counters(self.profile);
         for info in &self.mapping_info {
             for func in &info.cov_fun {
+                let base_region_ids = self.get_simple_counters(func);
                 let paths = info.get_files_from_id(func.header.filenames_ref);
                 if paths.is_empty() {
                     continue;
                 }
 
-                let record = self.profile.records.iter().find(|x| {
-                    x.hash == Some(func.header.fn_hash)
-                        && Some(func.header.name_hash) == x.name.as_ref().map(compute_hash)
-                });
-                let mut region_ids = HashMap::new();
-                region_ids.insert(Counter::default(), 0);
+                let mut region_ids = base_region_ids.clone();
 
                 for region in func.regions.iter().filter(|x| !x.count.is_expression()) {
-                    let count = match record.as_ref() {
-                        Some(rec) => rec
-                            .counts()
-                            .get(region.count.id as usize)
-                            .copied()
-                            .unwrap_or_default() as i64,
-                        None => 0,
-                    };
-                    region_ids.insert(region.count.clone(), count);
-
+                    let count = region_ids.get(&region.count).copied().unwrap_or_default();
                     let result = report
                         .files
                         .entry(paths[region.file_id].clone())
