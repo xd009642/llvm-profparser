@@ -163,8 +163,16 @@ impl InstrumentationProfile {
                     rec.record.merge(&record.record);
                 }
             } else {
-                self.symtab.names.insert(hash, record.name_unchecked());
-                self.records.push(record.clone());
+                if let Some(alt_hash) = record.hash {
+                    if self.symtab.contains(alt_hash) {
+                        if let Some(rec) = self.records.iter_mut().find(|x| x.name == record.name) {
+                            rec.record.merge(&record.record);
+                        }
+                    }
+                } else {
+                    self.symtab.names.insert(hash, record.name_unchecked());
+                    self.records.push(record.clone());
+                }
             }
         }
     }
