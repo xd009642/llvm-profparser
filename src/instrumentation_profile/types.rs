@@ -55,7 +55,6 @@ impl Symtab {
     /// otherwise.
     pub fn add_func_name(&mut self, name: String, endianness: Option<Endianness>) {
         let hash = match endianness {
-            Some(Endianness::Little) => compute_hash(&name),
             Some(Endianness::Big) => compute_be_hash(&name),
             _ => compute_hash(&name),
         };
