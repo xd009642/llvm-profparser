@@ -195,6 +195,7 @@ fn show_profdatas() {
 }
 
 #[test]
+#[cfg_attr(llvm_15, ignore)]
 fn merge() {
     let data = get_data_dir();
     let files = [
