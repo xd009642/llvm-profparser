@@ -328,7 +328,7 @@ pub struct ValueProfRecord {
 }
 
 impl ValueProfData {
-    fn deserialize_to(&self, record: &mut InstrProfRecord, symtab: Option<&Symtab>) {
+    fn deserialize_to(&self, _record: &mut InstrProfRecord, _symtab: Option<&Symtab>) {
         if self.num_value_kinds == 0 {
             return;
         }

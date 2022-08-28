@@ -245,7 +245,7 @@ where
         header: &Header,
         data: &ProfileData<T>,
         bytes: &'a [u8],
-        record: &mut InstrProfRecord,
+        _record: &mut InstrProfRecord,
     ) -> IResult<&'a [u8], ()> {
         // record clear value data
         if data.num_value_sites.iter().all(|x| *x == 0) {
@@ -253,7 +253,7 @@ where
             // wewww
             Ok((bytes, ()))
         } else {
-            let (bytes, total_size) = nom_u32(header.endianness)(bytes)?;
+            let (_bytes, _total_size) = nom_u32(header.endianness)(bytes)?;
             todo!()
         }
     }

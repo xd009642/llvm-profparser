@@ -129,8 +129,8 @@ impl InstrProfReader for IndexedInstrProf {
 
     fn parse_bytes(mut input: &[u8]) -> IResult<&[u8], InstrumentationProfile> {
         let (bytes, header) = Self::parse_header(input)?;
-        let (bytes, summary) = parse_summary(bytes, &header, false)?;
-        let (bytes, cs_summary) = if header.is_csir_prof() {
+        let (bytes, _summary) = parse_summary(bytes, &header, false)?;
+        let (bytes, _cs_summary) = if header.is_csir_prof() {
             parse_summary(bytes, &header, true)?
         } else {
             (bytes, None)

@@ -1,10 +1,9 @@
-use cargo_metadata::{diagnostic::DiagnosticLevel, CargoOpt, Message, Metadata, MetadataCommand};
-use llvm_profparser::{merge_profiles, parse, parse_bytes, CoverageMapping};
+use cargo_metadata::Message;
+use llvm_profparser::{parse, CoverageMapping};
 use pretty_assertions::assert_eq;
 use regex::Regex;
-use std::collections::HashSet;
-use std::ffi::OsStr;
-use std::fs::{self, read_dir};
+
+use std::fs::{self};
 use std::io;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};

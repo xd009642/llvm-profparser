@@ -11,9 +11,9 @@ pub struct ValueSiteStats {
 impl ValueSiteStats {
     pub fn traverse_sites(
         &mut self,
-        func: &InstrProfRecord,
-        value: ValueKind,
-        symtab: Option<&Symtab>,
+        _func: &InstrProfRecord,
+        _value: ValueKind,
+        _symtab: Option<&Symtab>,
     ) {
         todo!()
     }
