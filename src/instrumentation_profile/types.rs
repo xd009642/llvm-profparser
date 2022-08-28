@@ -154,17 +154,18 @@ impl InstrumentationProfile {
     }
 
     pub fn merge_record(&mut self, record: &NamedInstrProfRecord) {
-        if self.symtab.contains(record.hash_unchecked()) {
-            // Find the record and merge things. 0 hashed records should have no counters in the
-            // code and otherwise we'll ignore the change that truncated md5 hashes can collide
-            if let Some(rec) = self.records.iter_mut().find(|x| x.name == record.name) {
-                rec.record.merge(&record.record);
+        if let Some(name) = record.name.as_ref() {
+            let hash = compute_hash(name);
+            if self.symtab.contains(hash) {
+                // Find the record and merge things. 0 hashed records should have no counters in the
+                // code and otherwise we'll ignore the change that truncated md5 hashes can collide
+                if let Some(rec) = self.records.iter_mut().find(|x| x.name == record.name) {
+                    rec.record.merge(&record.record);
+                }
+            } else {
+                self.symtab.names.insert(hash, record.name_unchecked());
+                self.records.push(record.clone());
             }
-        } else {
-            self.symtab
-                .names
-                .insert(record.hash_unchecked(), record.name_unchecked());
-            self.records.push(record.clone());
         }
     }
 

@@ -208,6 +208,19 @@ fn merge() {
 }
 
 #[test]
+fn profraw_merging() {
+    let premerge_1 = data_root_dir().join("misc").join("premerge_1.profraw");
+    let premerge_2 = data_root_dir().join("misc").join("premerge_2.profraw");
+    let merged = data_root_dir().join("misc").join("merged.profdata");
+
+    let expected_merged = merge_profiles(&[merged]).unwrap();
+    let merged = merge_profiles(&[premerge_1, premerge_2]).unwrap();
+
+    assert_eq!(merged.symtab, expected_merged.symtab);
+    assert_eq!(merged.records, expected_merged.records);
+}
+
+#[test]
 fn check_raw_data_consistency() {
     let raw = data_root_dir().join("misc").join("stable.profraw");
     let data = data_root_dir().join("misc").join("stable.profdata");
