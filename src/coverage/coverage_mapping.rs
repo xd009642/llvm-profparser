@@ -256,7 +256,7 @@ fn parse_coverage_mapping<'data, 'file>(
             // Read the length of the affixed string that contains encoded coverage mapping data (now 0
             // as not in this header)
             debug_assert_eq!(endian.read_i32_bytes(data[8..12].try_into().unwrap()), 0);
-            let format_version = endian.read_i32_bytes(data[12..16].try_into().unwrap());
+            let _format_version = endian.read_i32_bytes(data[12..16].try_into().unwrap());
 
             let hash = md5::compute(&data[16..(filename_data_len as usize + 16)]);
             let hash = endian.read_u64_bytes(hash.0[..8].try_into().unwrap());
@@ -301,7 +301,7 @@ fn parse_coverage_functions<'data, 'file>(
                 fn_hash,
                 filenames_ref,
             };
-            let start_len = bytes[28..].len();
+            let _start_len = bytes[28..].len();
             bytes = &bytes[28..];
 
             let (data, id_len) = parse_leb128(bytes).unwrap();
@@ -395,7 +395,7 @@ fn parse_mapping_regions<'a>(
                         Ok(RegionKind::Code) | Ok(RegionKind::Skipped) => {}
                         Ok(RegionKind::Branch) => {
                             kind = RegionKind::Branch;
-                            let (data, c1) = parse_leb128(bytes)?;
+                            let (_data, c1) = parse_leb128(bytes)?;
                             let (data, c2) = parse_leb128(bytes)?;
 
                             counter = parse_counter(c1, expressions);
@@ -453,7 +453,7 @@ fn parse_profile_data<'data, 'file>(
             let name_md5 = endian.read_u64_bytes(bytes[..8].try_into().unwrap());
             let structural_hash = endian.read_u64_bytes(bytes[8..16].try_into().unwrap());
 
-            let counter_ptr = endian.read_u64_bytes(bytes[16..24].try_into().unwrap());
+            let _counter_ptr = endian.read_u64_bytes(bytes[16..24].try_into().unwrap());
             bytes = &bytes[(24 + 16)..];
             let counters_len = endian.read_u32_bytes(bytes[..4].try_into().unwrap());
             // TODO Might need to get the counter offset and get the list of counters from this?

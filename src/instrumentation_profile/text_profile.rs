@@ -359,7 +359,7 @@ mod tests {
     #[test]
     fn simple_hex_parse() {
         let simple = "main\n0x0\n1\n100";
-        let (buf, report) = TextInstrProf::parse_bytes(simple.as_bytes()).unwrap();
+        let (_buf, report) = TextInstrProf::parse_bytes(simple.as_bytes()).unwrap();
 
         assert_eq!(report.get_level(), InstrumentationLevel::FrontEnd);
         assert_eq!(report.records.len(), 1);
