@@ -208,6 +208,50 @@ fn merge() {
 }
 
 #[test]
+fn multi_app_profraw_merging() {
+    let premerge_1 = data_root_dir()
+        .join("misc")
+        .join("multibin_merge/bin_1.profraw");
+    let premerge_2 = data_root_dir()
+        .join("misc")
+        .join("multibin_merge/bin_2.1.profraw");
+    let premerge_3 = data_root_dir()
+        .join("misc")
+        .join("multibin_merge/bin_2.2.profraw");
+    let premerge_4 = data_root_dir()
+        .join("misc")
+        .join("multibin_merge/bin_2.3.profraw");
+
+    let merged = merge_profiles(&[
+        premerge_1.clone(),
+        premerge_2.clone(),
+        premerge_3.clone(),
+        premerge_4.clone(),
+    ])
+    .unwrap();
+
+    let profraw = parse(&premerge_1).unwrap();
+    for (hash, name) in profraw.symtab.iter() {
+        assert_eq!(merged.symtab.get(*hash), Some(name));
+    }
+
+    let profraw = parse(&premerge_2).unwrap();
+    for (hash, name) in profraw.symtab.iter() {
+        assert_eq!(merged.symtab.get(*hash), Some(name));
+    }
+
+    let profraw = parse(&premerge_3).unwrap();
+    for (hash, name) in profraw.symtab.iter() {
+        assert_eq!(merged.symtab.get(*hash), Some(name));
+    }
+
+    let profraw = parse(&premerge_4).unwrap();
+    for (hash, name) in profraw.symtab.iter() {
+        assert_eq!(merged.symtab.get(*hash), Some(name));
+    }
+}
+
+#[test]
 fn profraw_merging() {
     let premerge_1 = data_root_dir().join("misc").join("premerge_1.profraw");
     let premerge_2 = data_root_dir().join("misc").join("premerge_2.profraw");
