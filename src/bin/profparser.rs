@@ -365,8 +365,9 @@ impl MergeCommand {
             !self.input.is_empty(),
             "No input files selected. See merge --help"
         );
-        let _profile = merge_profiles(&self.input)?;
+        let profile = merge_profiles(&self.input)?;
         // Now to write it out?
+        println!("{:#?}", profile);
         Ok(())
     }
 }

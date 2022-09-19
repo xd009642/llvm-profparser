@@ -147,6 +147,9 @@ impl InstrumentationProfile {
     }
 
     pub fn merge(&mut self, other: &Self) {
+        if self.version.is_none() && other.version.is_some() {
+            self.version = other.version.clone();
+        }
         for func in &other.records {
             self.merge_record(&func);
         }
@@ -187,10 +190,16 @@ impl InstrumentationProfile {
         }
     }
 
+    /// Gets the instrumentation record for the give function
     pub fn get_record(&self, name: &str) -> Option<&NamedInstrProfRecord> {
         self.records
             .iter()
             .find(|x| x.name.as_deref() == Some(name))
+    }
+
+    /// Returns true if there are no instrumentation records associated with the profile
+    pub fn is_empty(&self) -> bool {
+        self.records.is_empty()
     }
 }
 
