@@ -42,6 +42,7 @@ pub enum LlvmSection {
 pub enum SectionReadError {
     EmptySection(LlvmSection),
     MissingSection(LlvmSection),
+    InvalidPathList,
 }
 
 impl fmt::Display for SectionReadError {
@@ -49,6 +50,7 @@ impl fmt::Display for SectionReadError {
         match self {
             Self::EmptySection(s) => write!(f, "empty section: {:?}", s),
             Self::MissingSection(s) => write!(f, "missing section: {:?}", s),
+            Self::InvalidPathList => write!(f, "unable to read path list"),
         }
     }
 }
@@ -78,14 +80,12 @@ pub fn read_object_file(object: &Path, version: u64) -> Result<CoverageMappingIn
     let prof_counts = object_file
         .section_by_name("__llvm_prf_cnts")
         .or(object_file.section_by_name(".lprfc"))
-        .map(|x| parse_profile_counters(object_file.endianness(), &x).ok())
-        .flatten();
+        .and_then(|x| parse_profile_counters(object_file.endianness(), &x).ok());
 
     let prof_data = object_file
         .section_by_name("__llvm_prf_data")
         .or(object_file.section_by_name(".lprfd"))
-        .map(|x| parse_profile_data(object_file.endianness(), &x).ok())
-        .flatten();
+        .and_then(|x| parse_profile_data(object_file.endianness(), &x).ok());
 
     Ok(CoverageMappingInfo {
         cov_map,
@@ -185,11 +185,11 @@ impl<'a> CoverageMapping<'a> {
                             std::mem::drop(lhs);
                             std::mem::drop(rhs);
                             // These counters have been optimised out, so just add then in as 0
-                            if lhs_none && expr.lhs.kind == CounterType::ProfileInstrumentation {
-                                region_ids.insert(expr.lhs.clone(), 0);
+                            if lhs_none && expr.lhs.is_instrumentation() {
+                                region_ids.insert(expr.lhs, 0);
                             }
-                            if rhs_none && expr.rhs.kind == CounterType::ProfileInstrumentation {
-                                region_ids.insert(expr.rhs.clone(), 0);
+                            if rhs_none && expr.rhs.is_instrumentation() {
+                                region_ids.insert(expr.rhs, 0);
                             }
                             pending_exprs.push((expr_index, expr));
                             continue;
@@ -265,7 +265,8 @@ fn parse_coverage_mapping<'data, 'file>(
 
             //let bytes = &data[16..(16 + filename_data_len as usize)];
             let bytes = &data[16..];
-            let (bytes, file_strings) = parse_path_list(bytes, version).unwrap();
+            let (bytes, file_strings) =
+                parse_path_list(bytes, version).map_err(|_| SectionReadError::InvalidPathList)?;
             result.insert(hash, file_strings);
             let read_len = data_len - bytes.len();
             let padding = if !bytes.is_empty() && (read_len & 0x07) != 0 {
@@ -384,7 +385,7 @@ fn parse_mapping_regions<'a>(
             bytes = data;
             let mut expanded_file_id = 0;
             let mut counter = parse_counter(raw_header, expressions);
-            if counter.kind == CounterType::Zero {
+            if counter.is_zero() {
                 if raw_header & Counter::ENCODING_EXPANSION_REGION_BIT > 0 {
                     kind = RegionKind::Expansion;
                     expanded_file_id = raw_header >> Counter::ENCODING_TAG_AND_EXP_REGION_BITS;
@@ -449,7 +450,7 @@ fn parse_profile_data<'data, 'file>(
     section: &Section<'data, 'file>,
 ) -> Result<Vec<ProfileData>, SectionReadError> {
     if let Ok(data) = section.data() {
-        let mut bytes = &data[..];
+        let mut bytes = data;
         let mut res = vec![];
         while !bytes.is_empty() {
             let name_md5 = endian.read_u64_bytes(bytes[..8].try_into().unwrap());

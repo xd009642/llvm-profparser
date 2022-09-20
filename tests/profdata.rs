@@ -178,20 +178,20 @@ fn check_against_text(ext: &OsStr) {
 #[test]
 fn show_profraws() {
     let ext = OsStr::new("profraw");
-    check_command(&ext);
+    check_command(ext);
 }
 
 #[test]
 fn show_proftexts() {
     let ext = OsStr::new("proftext");
-    check_command(&ext);
+    check_command(ext);
 }
 
 #[test]
 fn show_profdatas() {
     let ext = OsStr::new("profdata");
     // Ordering of elements in printout make most of these tests troublesome
-    check_against_text(&ext);
+    check_against_text(ext);
 }
 
 #[test]
@@ -277,8 +277,8 @@ fn check_raw_data_consistency() {
         println!("Seeing if {}:{} in Raw", hash, name);
         std::assert_eq!(name, raw.symtab.get(*hash).unwrap());
 
-        let data_record = data.get_record(&name);
-        let raw_record = raw.get_record(&name);
+        let data_record = data.get_record(name);
+        let raw_record = raw.get_record(name);
         std::assert_eq!(data_record, raw_record);
     }
 }

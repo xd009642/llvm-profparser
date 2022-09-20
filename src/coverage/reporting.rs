@@ -79,7 +79,7 @@ impl FromStr for PathRemapping {
     type Err = RemappingParseError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let paths: Vec<&str> = s.split(",").collect();
+        let paths: Vec<&str> = s.split(',').collect();
 
         if paths.is_empty() {
             Err(Self::Err::EmptyRemapping)

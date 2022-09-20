@@ -12,6 +12,7 @@ jobs:
       matrix:
         version:
           - 1.53.0
+          - 1.56.0
           - stable
           - beta
           - nightly 
