@@ -42,7 +42,7 @@ pub enum LlvmSection {
 pub enum SectionReadError {
     EmptySection(LlvmSection),
     MissingSection(LlvmSection),
-    InvalidPathList
+    InvalidPathList,
 }
 
 impl fmt::Display for SectionReadError {
@@ -265,7 +265,8 @@ fn parse_coverage_mapping<'data, 'file>(
 
             //let bytes = &data[16..(16 + filename_data_len as usize)];
             let bytes = &data[16..];
-            let (bytes, file_strings) = parse_path_list(bytes, version).map_err(|_| SectionReadError::InvalidPathList)?;
+            let (bytes, file_strings) =
+                parse_path_list(bytes, version).map_err(|_| SectionReadError::InvalidPathList)?;
             result.insert(hash, file_strings);
             let read_len = data_len - bytes.len();
             let padding = if !bytes.is_empty() && (read_len & 0x07) != 0 {

@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Added anyhow and use in place of `Result<T, Box<dyn Error>>`
+- Bumped MSRV from 1.53 to 1.56
 
 ### Fixed
 - Handle merging of completely disjoint records - now profiles generated from multiple

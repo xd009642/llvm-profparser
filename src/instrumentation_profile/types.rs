@@ -302,7 +302,8 @@ fn merge_site_records(dst: &mut InstrProfValueSiteRecord, src: &InstrProfValueSi
                 .iter_mut()
                 .enumerate()
                 .skip(i)
-                .skip_while(|x| x.1.value < j.value).next();
+                .skip_while(|x| x.1.value < j.value)
+                .next();
 
             match current {
                 Some((index, element)) if element.value == j.value => {
