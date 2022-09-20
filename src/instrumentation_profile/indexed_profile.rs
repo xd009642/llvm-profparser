@@ -22,10 +22,10 @@ pub enum HashType {
 impl TryFrom<u64> for HashType {
     type Error = anyhow::Error;
 
-    fn try_from(value: u64) -> Result<Self, Self::Error> { 
+    fn try_from(value: u64) -> Result<Self, Self::Error> {
         match value {
             0 => Ok(Self::Md5),
-            e => bail!("no variant matching {} found in `HashType`", e)
+            e => bail!("no variant matching {} found in `HashType`", e),
         }
     }
 }
@@ -51,7 +51,7 @@ pub enum SummaryFieldKind {
 impl TryFrom<u64> for SummaryFieldKind {
     type Error = anyhow::Error;
 
-    fn try_from(value: u64) -> Result<Self, Self::Error> { 
+    fn try_from(value: u64) -> Result<Self, Self::Error> {
         match value {
             0 => Ok(Self::TotalNumFunctions),
             1 => Ok(Self::TotalNumBlocks),
@@ -59,7 +59,7 @@ impl TryFrom<u64> for SummaryFieldKind {
             3 => Ok(Self::MaxBlockCount),
             4 => Ok(Self::MaxInternalBlockCount),
             5 => Ok(Self::TotalBlockCount),
-            e => bail!("no variant matching {} found in `SummaryFieldKind`", e)
+            e => bail!("no variant matching {} found in `SummaryFieldKind`", e),
         }
     }
 }
