@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - `InstrumenationProfile::is_empty` to detect when there are no records
 
+### Changed
+- Added anyhow and use in place of `Result<T, Box<dyn Error>>`
+
 ### Fixed
 - Handle merging of completely disjoint records - now profiles generated from multiple
 applications are accurately merged
