@@ -1,3 +1,4 @@
+use anyhow::Result;
 use llvm_profparser::*;
 use std::fs;
 use std::path::PathBuf;
@@ -34,7 +35,7 @@ pub struct ShowCommand {
 }
 
 impl ShowCommand {
-    fn run(&self) -> Result<(), Box<dyn std::error::Error>> {
+    fn run(&self) -> Result<()> {
         let instr_prof = if self.instr_profile.len() == 1 {
             parse(&self.instr_profile[0])?
         } else if self.instr_profile.len() > 1 {
@@ -68,7 +69,7 @@ impl ShowCommand {
     }
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn main() -> Result<()> {
     let opts = Opts::from_args();
     match opts.cmd {
         Command::Show { show } => show.run(),

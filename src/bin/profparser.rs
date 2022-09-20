@@ -1,3 +1,4 @@
+use anyhow::Result;
 use llvm_profparser::instrumentation_profile::stats::*;
 use llvm_profparser::instrumentation_profile::summary::*;
 use llvm_profparser::instrumentation_profile::types::*;
@@ -181,7 +182,7 @@ impl PartialEq for HotFn {
 }
 
 impl ShowCommand {
-    pub fn run(&self) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn run(&self) -> Result<()> {
         let profile = parse(&self.input)?;
         let mut summary = ProfileSummary::new();
         let mut stats = vec![ValueSiteStats::default(); ValueKind::len()];
@@ -360,7 +361,7 @@ impl ShowCommand {
 }
 
 impl MergeCommand {
-    fn run(&self) -> Result<(), Box<dyn std::error::Error>> {
+    fn run(&self) -> Result<()> {
         assert!(
             !self.input.is_empty(),
             "No input files selected. See merge --help"
@@ -372,7 +373,7 @@ impl MergeCommand {
     }
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn main() -> Result<()> {
     let opts = Opts::from_args();
     match opts.cmd {
         Command::Show { show } => show.run(),
