@@ -17,16 +17,15 @@ default = ["cli"]
 cli = ["structopt"]
 
 [dependencies]
+anyhow = "1.0.65"
 flate2 = "1.0"
 indexmap = "~1.8"
 leb128 = "0.2.4"
-nom = "7.0.0"
-num_enum = "0.5.1"
 md5 = "0.7"
+nom = "7.0.0"
 object = "0.26.0"
 structopt = { version = "0.3.21", optional = true }
 thiserror = "1.0.30"
-anyhow = "1.0.65"
 
 [dev-dependencies]
 assert_cmd = "2"

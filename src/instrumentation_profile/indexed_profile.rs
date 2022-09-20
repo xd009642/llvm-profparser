@@ -1,11 +1,11 @@
 use crate::hash_table::*;
 use crate::instrumentation_profile::*;
 use crate::summary::*;
+use anyhow::bail;
 use nom::{
     number::{complete::*, Endianness},
     IResult,
 };
-use num_enum::TryFromPrimitive;
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::io::Read;
@@ -13,10 +13,21 @@ use std::io::Read;
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub struct IndexedInstrProf;
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Ord, PartialOrd, TryFromPrimitive)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Ord, PartialOrd)]
 #[repr(u64)]
 pub enum HashType {
     Md5,
+}
+
+impl TryFrom<u64> for HashType {
+    type Error = anyhow::Error;
+
+    fn try_from(value: u64) -> Result<Self, Self::Error> { 
+        match value {
+            0 => Ok(Self::Md5),
+            e => bail!("no variant matching {} found in `HashType`", e)
+        }
+    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -26,7 +37,7 @@ pub struct Header {
     pub hash_offset: u64,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Ord, PartialOrd, Hash, TryFromPrimitive)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Ord, PartialOrd, Hash)]
 #[repr(u64)]
 pub enum SummaryFieldKind {
     TotalNumFunctions,
@@ -35,6 +46,22 @@ pub enum SummaryFieldKind {
     MaxBlockCount,
     MaxInternalBlockCount,
     TotalBlockCount,
+}
+
+impl TryFrom<u64> for SummaryFieldKind {
+    type Error = anyhow::Error;
+
+    fn try_from(value: u64) -> Result<Self, Self::Error> { 
+        match value {
+            0 => Ok(Self::TotalNumFunctions),
+            1 => Ok(Self::TotalNumBlocks),
+            2 => Ok(Self::MaxFunctionCount),
+            3 => Ok(Self::MaxBlockCount),
+            4 => Ok(Self::MaxInternalBlockCount),
+            5 => Ok(Self::TotalBlockCount),
+            e => bail!("no variant matching {} found in `SummaryFieldKind`", e)
+        }
+    }
 }
 
 impl Header {
@@ -64,7 +91,7 @@ fn parse_summary<'a>(
         for i in 0..n_fields {
             let (bytes, value) = le_u64(input)?;
             input = bytes;
-            if let Ok(field) = SummaryFieldKind::try_from_primitive(i) {
+            if let Ok(field) = SummaryFieldKind::try_from(i) {
                 fields.insert(field, value);
             }
         }
