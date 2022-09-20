@@ -185,10 +185,10 @@ impl<'a> CoverageMapping<'a> {
                             std::mem::drop(lhs);
                             std::mem::drop(rhs);
                             // These counters have been optimised out, so just add then in as 0
-                            if lhs_none && expr.lhs.kind == CounterType::ProfileInstrumentation {
+                            if lhs_none && expr.lhs.is_instrumentation() {
                                 region_ids.insert(expr.lhs, 0);
                             }
-                            if rhs_none && expr.rhs.kind == CounterType::ProfileInstrumentation {
+                            if rhs_none && expr.rhs.is_instrumentation() {
                                 region_ids.insert(expr.rhs, 0);
                             }
                             pending_exprs.push((expr_index, expr));
@@ -384,7 +384,7 @@ fn parse_mapping_regions<'a>(
             bytes = data;
             let mut expanded_file_id = 0;
             let mut counter = parse_counter(raw_header, expressions);
-            if counter.kind == CounterType::Zero {
+            if counter.is_zero() {
                 if raw_header & Counter::ENCODING_EXPANSION_REGION_BIT > 0 {
                     kind = RegionKind::Expansion;
                     expanded_file_id = raw_header >> Counter::ENCODING_TAG_AND_EXP_REGION_BITS;
