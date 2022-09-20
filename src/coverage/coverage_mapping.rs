@@ -80,14 +80,12 @@ pub fn read_object_file(object: &Path, version: u64) -> Result<CoverageMappingIn
     let prof_counts = object_file
         .section_by_name("__llvm_prf_cnts")
         .or(object_file.section_by_name(".lprfc"))
-        .map(|x| parse_profile_counters(object_file.endianness(), &x).ok())
-        .flatten();
+        .and_then(|x| parse_profile_counters(object_file.endianness(), &x).ok());
 
     let prof_data = object_file
         .section_by_name("__llvm_prf_data")
         .or(object_file.section_by_name(".lprfd"))
-        .map(|x| parse_profile_data(object_file.endianness(), &x).ok())
-        .flatten();
+        .and_then(|x| parse_profile_data(object_file.endianness(), &x).ok());
 
     Ok(CoverageMappingInfo {
         cov_map,
@@ -188,10 +186,10 @@ impl<'a> CoverageMapping<'a> {
                             std::mem::drop(rhs);
                             // These counters have been optimised out, so just add then in as 0
                             if lhs_none && expr.lhs.kind == CounterType::ProfileInstrumentation {
-                                region_ids.insert(expr.lhs.clone(), 0);
+                                region_ids.insert(expr.lhs, 0);
                             }
                             if rhs_none && expr.rhs.kind == CounterType::ProfileInstrumentation {
-                                region_ids.insert(expr.rhs.clone(), 0);
+                                region_ids.insert(expr.rhs, 0);
                             }
                             pending_exprs.push((expr_index, expr));
                             continue;
@@ -451,7 +449,7 @@ fn parse_profile_data<'data, 'file>(
     section: &Section<'data, 'file>,
 ) -> Result<Vec<ProfileData>, SectionReadError> {
     if let Ok(data) = section.data() {
-        let mut bytes = &data[..];
+        let mut bytes = data;
         let mut res = vec![];
         while !bytes.is_empty() {
             let name_md5 = endian.read_u64_bytes(bytes[..8].try_into().unwrap());

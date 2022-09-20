@@ -1,5 +1,5 @@
 use crate::instrumentation_profile::types::compute_hash;
-use crate::InstrumentationProfile;
+
 use nom::IResult;
 use std::collections::HashMap;
 use std::convert::TryFrom;

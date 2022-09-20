@@ -62,7 +62,7 @@ impl ShowCommand {
                         println!("       |{}", source);
                     }
                 }
-                println!("");
+                println!();
             }
         }
         Ok(())

@@ -10,7 +10,7 @@ fn main() {
     if let Some(major) = version_info
         .lines()
         .find_map(|x| x.strip_prefix("LLVM version: "))
-        .and_then(|x| x.split(".").next())
+        .and_then(|x| x.split('.').next())
     {
         println!("cargo:rustc-cfg=llvm_{}", major);
     }

@@ -148,10 +148,10 @@ impl InstrumentationProfile {
 
     pub fn merge(&mut self, other: &Self) {
         if self.version.is_none() && other.version.is_some() {
-            self.version = other.version.clone();
+            self.version = other.version;
         }
         for func in &other.records {
-            self.merge_record(&func);
+            self.merge_record(func);
         }
     }
 
@@ -167,21 +167,19 @@ impl InstrumentationProfile {
                 } else {
                     false
                 }
-            } else {
-                if let Some(alt_hash) = record.hash {
-                    if self.symtab.contains(alt_hash) {
-                        if let Some(rec) = self.records.iter_mut().find(|x| x.name == record.name) {
-                            rec.record.merge(&record.record);
-                            true
-                        } else {
-                            false
-                        }
+            } else if let Some(alt_hash) = record.hash {
+                if self.symtab.contains(alt_hash) {
+                    if let Some(rec) = self.records.iter_mut().find(|x| x.name == record.name) {
+                        rec.record.merge(&record.record);
+                        true
                     } else {
                         false
                     }
                 } else {
                     false
                 }
+            } else {
+                false
             };
             if !added {
                 self.symtab.names.insert(hash, record.name_unchecked());
@@ -304,8 +302,7 @@ fn merge_site_records(dst: &mut InstrProfValueSiteRecord, src: &InstrProfValueSi
                 .iter_mut()
                 .enumerate()
                 .skip(i)
-                .skip_while(|x| x.1.value < j.value)
-                .nth(0);
+                .skip_while(|x| x.1.value < j.value).next();
 
             match current {
                 Some((index, element)) if element.value == j.value => {

@@ -332,7 +332,7 @@ where
             input = bytes;
             for (data, mut record) in data_section.iter().zip(counters.drain(..)) {
                 let (bytes, _) =
-                    Self::read_value_profiling_data(&header, &data, input, &mut record)?;
+                    Self::read_value_profiling_data(&header, data, input, &mut record)?;
                 input = bytes;
                 let name = symtab.names.get(&data.name_ref).cloned();
                 let hash = if name.is_some() {
@@ -357,18 +357,18 @@ where
             let endianness = file_endianness::<T>(&input[..8].try_into().unwrap());
             let (bytes, version) = nom_u64(endianness)(&input[8..])?;
             let (bytes, binary_ids_len) = if (version & !VARIANT_MASKS_ALL) >= 7 {
-                nom_u64(endianness)(&bytes[..])?
+                nom_u64(endianness)(bytes)?
             } else {
                 (bytes, 0)
             };
-            let (bytes, data_len) = nom_u64(endianness)(&bytes[..])?;
-            let (bytes, padding_bytes_before_counters) = nom_u64(endianness)(&bytes[..])?;
-            let (bytes, counters_len) = nom_u64(endianness)(&bytes[..])?;
-            let (bytes, padding_bytes_after_counters) = nom_u64(endianness)(&bytes[..])?;
-            let (bytes, names_len) = nom_u64(endianness)(&bytes[..])?;
-            let (bytes, counters_delta) = nom_u64(endianness)(&bytes[..])?;
-            let (bytes, names_delta) = nom_u64(endianness)(&bytes[..])?;
-            let (bytes, value_kind_last) = nom_u64(endianness)(&bytes[..])?;
+            let (bytes, data_len) = nom_u64(endianness)(bytes)?;
+            let (bytes, padding_bytes_before_counters) = nom_u64(endianness)(bytes)?;
+            let (bytes, counters_len) = nom_u64(endianness)(bytes)?;
+            let (bytes, padding_bytes_after_counters) = nom_u64(endianness)(bytes)?;
+            let (bytes, names_len) = nom_u64(endianness)(bytes)?;
+            let (bytes, counters_delta) = nom_u64(endianness)(bytes)?;
+            let (bytes, names_delta) = nom_u64(endianness)(bytes)?;
+            let (bytes, value_kind_last) = nom_u64(endianness)(bytes)?;
 
             let result = Header {
                 endianness,
@@ -407,14 +407,14 @@ where
     fn parse(bytes: &[u8], endianness: Endianness) -> IResult<&[u8], Self> {
         let parse = T::nom_parse_fn(endianness);
 
-        let (bytes, name_ref) = nom_u64(endianness)(&bytes[..])?;
-        let (bytes, func_hash) = nom_u64(endianness)(&bytes[..])?;
-        let (bytes, counter_ptr) = parse(&bytes[..])?;
-        let (bytes, function_addr) = parse(&bytes[..])?;
-        let (bytes, values_ptr_expr) = parse(&bytes[..])?;
-        let (bytes, num_counters) = nom_u32(endianness)(&bytes[..])?;
-        let (bytes, value_0) = nom_u16(endianness)(&bytes[..])?;
-        let (bytes, value_1) = nom_u16(endianness)(&bytes[..])?;
+        let (bytes, name_ref) = nom_u64(endianness)(bytes)?;
+        let (bytes, func_hash) = nom_u64(endianness)(bytes)?;
+        let (bytes, counter_ptr) = parse(bytes)?;
+        let (bytes, function_addr) = parse(bytes)?;
+        let (bytes, values_ptr_expr) = parse(bytes)?;
+        let (bytes, num_counters) = nom_u32(endianness)(bytes)?;
+        let (bytes, value_0) = nom_u16(endianness)(bytes)?;
+        let (bytes, value_1) = nom_u16(endianness)(bytes)?;
 
         Ok((
             bytes,

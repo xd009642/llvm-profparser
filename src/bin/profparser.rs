@@ -133,15 +133,13 @@ fn try_parse_weighted(input: &str) -> Result<(u64, String), String> {
     } else {
         let parts = input.split(',').collect::<Vec<_>>();
         if parts.len() != 2 {
-            Err(format!(
-                "Unexpected weighting format, expected $weight,$name or just $name"
-            ))
+            Err("Unexpected weighting format, expected $weight,$name or just $name".to_string())
         } else {
             let weight = parts[0]
                 .parse()
                 .map_err(|e| format!("Invalid weight: {}", e))?;
             if weight < 1 {
-                Err(format!("Weight must be positive integer"))
+                Err("Weight must be positive integer".to_string())
             } else {
                 Ok((weight, parts[1].to_string()))
             }
