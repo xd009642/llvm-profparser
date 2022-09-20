@@ -2,6 +2,7 @@ use crate::coverage::reporting::*;
 use crate::coverage::*;
 use crate::instrumentation_profile::types::*;
 use crate::util::*;
+use anyhow::{bail, Result};
 use object::{Endian, Endianness, Object, ObjectSection, Section};
 use std::collections::HashMap;
 use std::convert::TryInto;
@@ -10,7 +11,13 @@ use std::fmt;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+/// Stores the instrumentation profile and information from the coverage mapping sections in the
+/// object files in order to construct a coverage report. Inspired, from the LLVM implementation
+/// with some differences/simplifications due to the fact this only hands instrumentation profiles
+/// for coverage.
+///
 /// So what the LLVM one has that this one doesn't yet:
+///
 /// 1. DenseMap<size_t, DenseSet<size_t>> RecordProvenance
 /// 2. std::vector<FunctionRecord> functions (this is probably taken straight from
 /// InstrumentationProfile
@@ -48,10 +55,7 @@ impl fmt::Display for SectionReadError {
 
 impl Error for SectionReadError {}
 
-pub fn read_object_file(
-    object: &Path,
-    version: u64,
-) -> Result<CoverageMappingInfo, Box<dyn Error>> {
+pub fn read_object_file(object: &Path, version: u64) -> Result<CoverageMappingInfo> {
     // I believe vnode sections added by llvm are unnecessary
 
     let binary_data = fs::read(object)?;
@@ -92,16 +96,14 @@ pub fn read_object_file(
 }
 
 impl<'a> CoverageMapping<'a> {
-    pub fn new(
-        object_files: &[PathBuf],
-        profile: &'a InstrumentationProfile,
-    ) -> Result<Self, Box<dyn Error>> {
+    pub fn new(object_files: &[PathBuf], profile: &'a InstrumentationProfile) -> Result<Self> {
         let mut mapping_info = vec![];
+        let version = match profile.version() {
+            Some(v) => v,
+            None => bail!("Invalid profile instrumentation, no version number provided"),
+        };
         for file in object_files {
-            mapping_info.push(read_object_file(
-                file.as_path(),
-                profile.version_unchecked(),
-            )?);
+            mapping_info.push(read_object_file(file.as_path(), version)?);
         }
         Ok(Self {
             profile,
