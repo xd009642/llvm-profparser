@@ -45,8 +45,14 @@ fn compute_be_hash(data: impl AsRef<[u8]>) -> u64 {
 }
 
 impl Symtab {
+    /// Number of symbols in the table
     pub fn len(&self) -> usize {
         self.names.len()
+    }
+
+    /// True if there are no symbols in the table
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
     }
 
     /// Some formats such as the Raw profiles have configurable endianness. I think these may
@@ -302,8 +308,7 @@ fn merge_site_records(dst: &mut InstrProfValueSiteRecord, src: &InstrProfValueSi
                 .iter_mut()
                 .enumerate()
                 .skip(i)
-                .skip_while(|x| x.1.value < j.value)
-                .next();
+                .find(|x| x.1.value >= j.value);
 
             match current {
                 Some((index, element)) if element.value == j.value => {
