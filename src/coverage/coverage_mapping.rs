@@ -182,8 +182,6 @@ impl<'a> CoverageMapping<'a> {
                         _ => {
                             let lhs_none = lhs.is_none();
                             let rhs_none = rhs.is_none();
-                            std::mem::drop(lhs);
-                            std::mem::drop(rhs);
                             // These counters have been optimised out, so just add then in as 0
                             if lhs_none && expr.lhs.is_instrumentation() {
                                 region_ids.insert(expr.lhs, 0);
@@ -243,9 +241,9 @@ impl<'a> CoverageMapping<'a> {
     }
 }
 
-fn parse_coverage_mapping<'data, 'file>(
+fn parse_coverage_mapping(
     endian: Endianness,
-    section: &Section<'data, 'file>,
+    section: &Section<'_, '_>,
     version: u64,
 ) -> Result<HashMap<u64, Vec<PathBuf>>, SectionReadError> {
     if let Ok(mut data) = section.data() {
@@ -285,9 +283,9 @@ fn parse_coverage_mapping<'data, 'file>(
     }
 }
 
-fn parse_coverage_functions<'data, 'file>(
+fn parse_coverage_functions(
     endian: Endianness,
-    section: &Section<'data, 'file>,
+    section: &Section<'_, '_>,
 ) -> Result<Vec<FunctionRecordV3>, SectionReadError> {
     if let Ok(data) = section.data() {
         let mut bytes = data;
@@ -445,9 +443,9 @@ fn parse_mapping_regions<'a>(
     Ok((bytes, mapping))
 }
 
-fn parse_profile_data<'data, 'file>(
+fn parse_profile_data(
     endian: Endianness,
-    section: &Section<'data, 'file>,
+    section: &Section<'_, '_>,
 ) -> Result<Vec<ProfileData>, SectionReadError> {
     if let Ok(data) = section.data() {
         let mut bytes = data;
@@ -479,9 +477,9 @@ fn parse_profile_data<'data, 'file>(
     }
 }
 
-fn parse_profile_counters<'data, 'file>(
+fn parse_profile_counters(
     endian: Endianness,
-    section: &Section<'data, 'file>,
+    section: &Section<'_, '_>,
 ) -> Result<Vec<u64>, SectionReadError> {
     if let Ok(data) = section.data() {
         let mut result = vec![];
@@ -500,7 +498,7 @@ fn parse_profile_counters<'data, 'file>(
 /// The equivalent llvm function is `RawCoverageMappingReader::decodeCounter`. This makes it
 /// stateless as I don't want to be maintaining an expression vector and clearing it and
 /// repopulating for every function record.
-fn parse_counter(input: u64, exprs: &mut Vec<Expression>) -> Counter {
+fn parse_counter(input: u64, exprs: &mut [Expression]) -> Counter {
     let ty = (Counter::ENCODING_TAG_MASK & input) as u8;
     let id = input >> 2; // For zero we don't actually care about this but we'll still do it
     let kind = match ty {
