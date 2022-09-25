@@ -82,7 +82,7 @@ fn parse_summary<'a>(
     mut input: &'a [u8],
     header: &Header,
     use_cs: bool,
-) -> IResult<&'a [u8], Option<ProfileSummary>> {
+) -> ParseResult<'a, Option<ProfileSummary>> {
     if header.version() >= 4 {
         let (bytes, n_fields) = le_u64(input)?;
         let (bytes, n_entries) = le_u64(bytes)?;
@@ -154,7 +154,7 @@ fn parse_summary<'a>(
 impl InstrProfReader for IndexedInstrProf {
     type Header = Header;
 
-    fn parse_bytes(mut input: &[u8]) -> IResult<&[u8], InstrumentationProfile> {
+    fn parse_bytes(mut input: &[u8]) -> ParseResult<InstrumentationProfile> {
         let (bytes, header) = Self::parse_header(input)?;
         let (bytes, _summary) = parse_summary(bytes, &header, false)?;
         let (bytes, _cs_summary) = if header.is_csir_prof() {
@@ -192,13 +192,13 @@ impl InstrProfReader for IndexedInstrProf {
         Ok((input, profile))
     }
 
-    fn parse_header(input: &[u8]) -> IResult<&[u8], Self::Header> {
+    fn parse_header(input: &[u8]) -> ParseResult<Self::Header> {
         if Self::has_format(input) {
             let (bytes, version) = le_u64(&input[8..])?;
             let (bytes, _) = le_u64(bytes)?;
             let (bytes, hash_type) = le_u64(bytes)?;
             let (bytes, hash_offset) = le_u64(bytes)?;
-            let hash_type = HashType::try_from(hash_type).expect("BAD ENUM BRUH");
+            let hash_type = HashType::try_from(hash_type).expect("BAD ENUM BRUH"); //TODO
             Ok((
                 bytes,
                 Self::Header {

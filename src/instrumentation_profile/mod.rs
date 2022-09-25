@@ -2,7 +2,7 @@ use crate::instrumentation_profile::indexed_profile::*;
 use crate::instrumentation_profile::raw_profile::*;
 use crate::instrumentation_profile::text_profile::*;
 use crate::instrumentation_profile::types::*;
-use nom::IResult;
+use nom::{error::VerboseError, IResult};
 use std::fs::File;
 use std::io;
 use std::io::prelude::*;
@@ -15,6 +15,8 @@ pub mod stats;
 pub mod summary;
 pub mod text_profile;
 pub mod types;
+
+pub type ParseResult<'a, T> = IResult<&'a [u8], T, VerboseError<&'a [u8]>>;
 
 pub const fn get_num_padding_bytes(len: u64) -> u8 {
     7 & (8 - (len % 8) as u8)
@@ -56,9 +58,9 @@ pub fn parse_bytes(data: &[u8]) -> io::Result<InstrumentationProfile> {
 pub trait InstrProfReader {
     type Header;
     /// Parse the profile no lazy parsing here!
-    fn parse_bytes(input: &[u8]) -> IResult<&[u8], InstrumentationProfile>;
+    fn parse_bytes(input: &[u8]) -> ParseResult<InstrumentationProfile>;
     /// Parses a header
-    fn parse_header(input: &[u8]) -> IResult<&[u8], Self::Header>;
+    fn parse_header(input: &[u8]) -> ParseResult<Self::Header>;
     /// Detects that the bytes match the current reader format if it can't read the format it will
     /// return false
     fn has_format(input: impl Read) -> bool;

@@ -3,6 +3,7 @@ use crate::coverage::*;
 use crate::instrumentation_profile::types::*;
 use crate::util::*;
 use anyhow::{bail, Result};
+use nom::error::Error as NomError;
 use object::{Endian, Endianness, Object, ObjectSection, Section};
 use std::collections::HashMap;
 use std::convert::TryInto;
@@ -263,8 +264,8 @@ fn parse_coverage_mapping(
 
             //let bytes = &data[16..(16 + filename_data_len as usize)];
             let bytes = &data[16..];
-            let (bytes, file_strings) =
-                parse_path_list(bytes, version).map_err(|_| SectionReadError::InvalidPathList)?;
+            let (bytes, file_strings) = parse_path_list(bytes, version)
+                .map_err(|_: nom::Err<NomError<_>>| SectionReadError::InvalidPathList)?;
             result.insert(hash, file_strings);
             let read_len = data_len - bytes.len();
             let padding = if !bytes.is_empty() && (read_len & 0x07) != 0 {
@@ -305,21 +306,21 @@ fn parse_coverage_functions(
             let _start_len = bytes[28..].len();
             bytes = &bytes[28..];
 
-            let (data, id_len) = parse_leb128(bytes).unwrap();
+            let (data, id_len) = parse_leb128::<NomError<_>>(bytes).unwrap();
             bytes = data;
             let mut filename_indices = vec![];
             for _ in 0..id_len {
-                let (data, id) = parse_leb128(bytes).unwrap(); // Issue
+                let (data, id) = parse_leb128::<NomError<_>>(bytes).unwrap(); // Issue
                 filename_indices.push(id);
                 bytes = data;
             }
-            let (data, expr_len) = parse_leb128(bytes).unwrap();
+            let (data, expr_len) = parse_leb128::<NomError<_>>(bytes).unwrap();
             let expr_len = expr_len as usize;
             bytes = data;
             let mut exprs = vec![Expression::default(); expr_len];
             for i in 0..expr_len {
-                let (data, lhs) = parse_leb128(bytes).unwrap();
-                let (data, rhs) = parse_leb128(data).unwrap();
+                let (data, lhs) = parse_leb128::<NomError<_>>(bytes).unwrap();
+                let (data, rhs) = parse_leb128::<NomError<_>>(data).unwrap();
                 let lhs = parse_counter(lhs, &mut exprs);
                 let rhs = parse_counter(rhs, &mut exprs);
                 exprs[i].lhs = lhs;
