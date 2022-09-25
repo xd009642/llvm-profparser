@@ -30,7 +30,7 @@ where
     let (input, uncompressed_size) = parse_leb128::<E>(input)?;
     let (input, compressed_size) = parse_leb128::<E>(input)?;
     if compressed_size != 0 {
-        if compressed_size as usize >= input.len() {
+        if compressed_size as usize > input.len() {
             Err(nom::Err::Error(E::from_error_kind(input, ErrorKind::Eof)))
         } else {
             let compressed_size = compressed_size as usize;
