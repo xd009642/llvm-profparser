@@ -174,7 +174,7 @@ fn compare_reports(run: &Run) {
     // ordering. LLVM seems to do the same. But for 1
 
     if profparser.is_empty() {
-        println!("{}", get_printout(&profparser_report.stderr));
+        println!("{}", get_printout(&profparser_report.stderr).join("\n"));
     }
 
     assert!(!llvm.is_empty());
