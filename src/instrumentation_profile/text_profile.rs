@@ -123,13 +123,26 @@ fn read_value_profile_data(mut input: &[u8]) -> ParseResult<Option<Box<ValueProf
         // We have value profiling data!
         if n_kinds == 0 || n_kinds > ValueKind::len() as u64 {
             // TODO I am malformed
-            todo!()
+            return Err(nom::Err::Failure(VerboseError::from_error_kind(
+                bytes,
+                ErrorKind::Satisfy,
+            )));
         }
         input = bytes;
         for _i in 0..n_kinds {
             let (bytes, _) = skip_to_content(input)?;
-            let (bytes, kind) = read_digit(bytes)?;
-            let (bytes, _) = skip_to_content(bytes)?;
+            let (bytes2, kind) = read_digit(bytes)?;
+            let kind = match kind {
+                0 => ValueKind::IndirectCallTarget,
+                1 => ValueKind::MemOpSize,
+                _ => {
+                    return Err(nom::Err::Failure(VerboseError::from_error_kind(
+                        bytes,
+                        ErrorKind::OneOf,
+                    )));
+                }
+            };
+            let (bytes, _) = skip_to_content(bytes2)?;
             let (bytes, n_sites) = match read_digit(bytes) {
                 Ok(s) => s,
                 Err(_) => {
@@ -137,13 +150,6 @@ fn read_value_profile_data(mut input: &[u8]) -> ParseResult<Option<Box<ValueProf
                     continue;
                 }
             };
-            // TODO is there a tidier way to go from discriminant to enum
-            let kind = match kind {
-                0 => ValueKind::IndirectCallTarget,
-                1 => ValueKind::MemOpSize,
-                _ => todo!(),
-            };
-            // let mut sites = vec![];
             input = bytes;
             for _j in 0..n_sites {
                 let (bytes, _) = skip_to_content(input)?;

@@ -3,8 +3,8 @@ use crate::instrumentation_profile::*;
 use crate::summary::*;
 use anyhow::bail;
 use nom::{
+    error::{ContextError, ErrorKind, ParseError, VerboseError},
     number::{complete::*, Endianness},
-    IResult,
 };
 use std::collections::HashMap;
 use std::convert::TryFrom;
@@ -197,8 +197,15 @@ impl InstrProfReader for IndexedInstrProf {
             let (bytes, version) = le_u64(&input[8..])?;
             let (bytes, _) = le_u64(bytes)?;
             let (bytes, hash_type) = le_u64(bytes)?;
+            let hash_type = HashType::try_from(hash_type).map_err(|e| {
+                let error = VerboseError::from_error_kind(bytes, ErrorKind::Satisfy);
+                nom::Err::Failure(VerboseError::add_context(
+                    bytes,
+                    "invalid enum variant for profile hash",
+                    error,
+                ))
+            })?;
             let (bytes, hash_offset) = le_u64(bytes)?;
-            let hash_type = HashType::try_from(hash_type).expect("BAD ENUM BRUH"); //TODO
             Ok((
                 bytes,
                 Self::Header {

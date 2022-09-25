@@ -284,6 +284,12 @@ where
                 result.fn_entry_only = header.function_entry_only();
                 result.memory_profiling = header.memory_profile();
             }
+            if bytes.len() <= header.binary_ids_len as usize {
+                return Err(nom::Err::Failure(VerboseError::from_error_kind(
+                    &bytes[bytes.len()..],
+                    ErrorKind::Eof,
+                )));
+            }
             input = &bytes[(header.binary_ids_len as usize)..];
             let mut data_section = vec![];
             for _ in 0..header.data_len {

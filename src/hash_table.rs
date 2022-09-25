@@ -1,6 +1,10 @@
 use crate::instrumentation_profile::{types::*, ParseResult};
 use indexmap::IndexMap;
-use nom::{number::complete::*, IResult};
+use nom::{
+    error::{VerboseError, VerboseErrorKind},
+    number::complete::*,
+    IResult,
+};
 use std::borrow::Cow;
 
 #[derive(Copy, Clone, Debug)]
@@ -31,7 +35,11 @@ fn read_value(
 ) -> ParseResult<(u64, InstrProfRecord)> {
     if data_len % 8 != 0 {
         // Element is corrupted, it should be aligned
-        todo!();
+        let errors = vec![(
+            input,
+            VerboseErrorKind::Context("table data length is not 8 byte aligned"),
+        )];
+        return Err(nom::Err::Failure(VerboseError { errors }));
     }
     let mut result = vec![];
     let end_len = input.len() - data_len;
