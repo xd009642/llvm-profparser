@@ -1,7 +1,7 @@
 use crate::instrumentation_profile::{types::*, ParseResult};
 use indexmap::IndexMap;
 use nom::{
-    error::{VerboseError, VerboseErrorKind},
+    error::{ErrorKind, ParseError, VerboseError, VerboseErrorKind},
     number::complete::*,
     IResult,
 };
@@ -24,8 +24,15 @@ fn read_key_data_len(input: &[u8]) -> ParseResult<KeyDataLen> {
 }
 
 fn read_key(input: &[u8], key_len: usize) -> ParseResult<Cow<'_, str>> {
-    let res = String::from_utf8_lossy(&input[..key_len]);
-    Ok((&input[key_len..], res))
+    if key_len > input.len() {
+        Err(nom::Err::Failure(VerboseError::from_error_kind(
+            &input[input.len()..],
+            ErrorKind::Eof,
+        )))
+    } else {
+        let res = String::from_utf8_lossy(&input[..key_len]);
+        Ok((&input[key_len..], res))
+    }
 }
 
 fn read_value(

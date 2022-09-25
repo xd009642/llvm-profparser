@@ -50,6 +50,7 @@ pub fn parse_bytes(data: &[u8]) -> io::Result<InstrumentationProfile> {
         ));
     };
     nom_res.map(|(_bytes, res)| res).map_err(|e| {
+        #[cfg(test)]
         println!("{}", e);
         io::Error::new(io::ErrorKind::Other, "Parsing failed")
     })

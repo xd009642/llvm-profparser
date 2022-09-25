@@ -36,10 +36,18 @@ where
             let compressed_size = compressed_size as usize;
             let mut decoder = ZlibDecoder::new(&input[..compressed_size]);
             let mut output = vec![];
-            decoder.read_to_end(&mut output).unwrap();
-            let name = String::from_utf8(output);
-            let name = name.unwrap();
-            Ok((&input[compressed_size..], name))
+            if let Ok(_) = decoder.read_to_end(&mut output) {
+                let name = String::from_utf8(output);
+                let name = name.unwrap();
+                Ok((&input[compressed_size..], name))
+            } else {
+                let inner = E::from_error_kind(input, ErrorKind::Satisfy);
+                Err(nom::Err::Failure(E::add_context(
+                    input,
+                    "invalid deflate stream",
+                    inner,
+                )))
+            }
         }
     } else {
         let uncompressed_size = uncompressed_size as usize;
