@@ -8,7 +8,7 @@ use nom::lib::std::ops::RangeFrom;
 use nom::number::streaming::{u16 as nom_u16, u32 as nom_u32, u64 as nom_u64};
 use nom::number::Endianness;
 use nom::{
-    error::{Error, ErrorKind},
+    error::{ContextError, Error, ErrorKind},
     Err, IResult,
 };
 use nom::{InputIter, InputLength, Slice};
@@ -221,6 +221,14 @@ where
             Err(Err::Failure(VerboseError::from_error_kind(
                 bytes,
                 ErrorKind::Satisfy,
+            )))
+        } else if counter_offset as usize > bytes.len() {
+            let pos = &bytes[bytes.len()..];
+            let inner = VerboseError::from_error_kind(pos, ErrorKind::Eof);
+            Err(Err::Failure(VerboseError::add_context(
+                pos,
+                "end of file reached before counters offset",
+                inner,
             )))
         } else {
             let mut counts = Vec::<u64>::new();

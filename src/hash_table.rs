@@ -48,6 +48,12 @@ fn read_value(
         )];
         return Err(nom::Err::Failure(VerboseError { errors }));
     }
+    if input.len() < data_len {
+        return Err(nom::Err::Failure(VerboseError::from_error_kind(
+            &input[input.len()..],
+            ErrorKind::Eof,
+        )));
+    }
     let mut result = vec![];
     let end_len = input.len() - data_len;
 
