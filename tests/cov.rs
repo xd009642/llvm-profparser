@@ -173,6 +173,10 @@ fn compare_reports(run: &Run) {
     // Internally I use a BTreeMap for the file list so they're always printed in lexicographic
     // ordering. LLVM seems to do the same. But for 1
 
+    if profparser.is_empty() {
+        println!("{}", get_printout(&profparser_report.stderr));
+    }
+
     assert!(!llvm.is_empty());
     assert!(!profparser.is_empty());
 

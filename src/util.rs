@@ -6,11 +6,20 @@ use nom::{
 use std::io::Read;
 use std::path::{Path, PathBuf};
 
-pub fn parse_leb128<'a, E>(mut input: &[u8]) -> IResult<&[u8], u64, E>
+pub fn parse_leb128<'a, E>(mut input: &'a [u8]) -> IResult<&'a [u8], u64, E>
 where
     E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
-    let x = leb128::read::unsigned(&mut input).unwrap();
+    let start = input;
+    let x = leb128::read::unsigned(&mut input).map_err(|e| {
+        use leb128::read::Error as LebError;
+        let kind = match e {
+            LebError::Overflow => ErrorKind::Satisfy,
+            // Here our Read impl is a slice so only one error possible
+            LebError::IoError(_) => ErrorKind::Eof,
+        };
+        nom::Err::Error(E::from_error_kind(start, kind))
+    })?;
     Ok((input, x))
 }
 
@@ -21,7 +30,7 @@ where
     let (input, uncompressed_size) = parse_leb128::<E>(input)?;
     let (input, compressed_size) = parse_leb128::<E>(input)?;
     if compressed_size != 0 {
-        if compressed_size >= input.len() as u64 {
+        if compressed_size as usize >= input.len() {
             Err(nom::Err::Error(E::from_error_kind(input, ErrorKind::Eof)))
         } else {
             let compressed_size = compressed_size as usize;
@@ -76,7 +85,7 @@ where
             output.reserve(uncompressed_size);
             decoder.read_to_end(&mut output).unwrap();
             // Use context error to
-            let values = parse_uncompressed_string_list::<E>(&output)
+            let values = parse_uncompressed_string_list::<()>(&output)
                 .map(|(_, v)| v.iter().map(PathBuf::from).collect())
                 .map_err(|_| nom::Err::Failure(E::from_error_kind(input, ErrorKind::Fail)))?;
             Ok((&input[compressed_size..], values))
@@ -84,7 +93,7 @@ where
     }
 }
 
-fn read_string<'a, E>(bytes: &[u8]) -> IResult<&[u8], String, E>
+fn read_string<'a, E>(bytes: &'a [u8]) -> IResult<&'a [u8], String, E>
 where
     E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
@@ -95,10 +104,10 @@ where
 }
 
 fn parse_uncompressed_file_list<'a, E>(
-    mut input: &[u8],
+    mut input: &'a [u8],
     list_length: u64,
     version: u64,
-) -> IResult<&[u8], Vec<PathBuf>, E>
+) -> IResult<&'a [u8], Vec<PathBuf>, E>
 where
     E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
@@ -131,7 +140,7 @@ where
     }
 }
 
-fn parse_uncompressed_string_list<'a, E>(mut input: &[u8]) -> IResult<&[u8], Vec<String>, E>
+fn parse_uncompressed_string_list<'a, E>(mut input: &'a [u8]) -> IResult<&'a [u8], Vec<String>, E>
 where
     E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
