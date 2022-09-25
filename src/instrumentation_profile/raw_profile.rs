@@ -284,7 +284,7 @@ where
                 result.fn_entry_only = header.function_entry_only();
                 result.memory_profiling = header.memory_profile();
             }
-            if bytes.len() <= header.binary_ids_len as usize {
+            if bytes.len() < header.binary_ids_len as usize {
                 return Err(nom::Err::Failure(VerboseError::from_error_kind(
                     &bytes[bytes.len()..],
                     ErrorKind::Eof,
