@@ -1,6 +1,6 @@
 use flate2::read::ZlibDecoder;
 use nom::{
-    error::{context, ContextError, Error, ErrorKind, ParseError},
+    error::{ContextError, ErrorKind, ParseError},
     IResult,
 };
 use std::io::Read;
@@ -53,7 +53,7 @@ where
         let uncompressed_size = uncompressed_size as usize;
         match String::from_utf8(input[..uncompressed_size].to_vec()) {
             Ok(name) => Ok((&input[uncompressed_size..], name)),
-            Err(e) => {
+            Err(_e) => {
                 let inner = E::from_error_kind(input, ErrorKind::Satisfy);
                 Err(nom::Err::Error(E::add_context(
                     input,

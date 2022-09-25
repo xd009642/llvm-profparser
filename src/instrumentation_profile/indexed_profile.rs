@@ -197,7 +197,7 @@ impl InstrProfReader for IndexedInstrProf {
             let (bytes, version) = le_u64(&input[8..])?;
             let (bytes, _) = le_u64(bytes)?;
             let (bytes, hash_type) = le_u64(bytes)?;
-            let hash_type = HashType::try_from(hash_type).map_err(|e| {
+            let hash_type = HashType::try_from(hash_type).map_err(|_e| {
                 let error = VerboseError::from_error_kind(bytes, ErrorKind::Satisfy);
                 nom::Err::Failure(VerboseError::add_context(
                     bytes,

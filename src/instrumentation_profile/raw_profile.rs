@@ -8,7 +8,7 @@ use nom::lib::std::ops::RangeFrom;
 use nom::number::streaming::{u16 as nom_u16, u32 as nom_u32, u64 as nom_u64};
 use nom::number::Endianness;
 use nom::{
-    error::{ContextError, Error, ErrorKind},
+    error::{ContextError, ErrorKind},
     Err, IResult,
 };
 use nom::{InputIter, InputLength, Slice};

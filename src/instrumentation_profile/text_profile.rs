@@ -7,7 +7,7 @@ use nom::character::{
     is_digit, is_hex_digit,
 };
 use nom::combinator::eof;
-use nom::error::{context, Error, ErrorKind, ParseError, VerboseError};
+use nom::error::{ErrorKind, ParseError, VerboseError};
 use nom::multi::*;
 use nom::sequence::*;
 use nom::*;

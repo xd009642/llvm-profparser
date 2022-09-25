@@ -3,7 +3,6 @@ use indexmap::IndexMap;
 use nom::{
     error::{ErrorKind, ParseError, VerboseError, VerboseErrorKind},
     number::complete::*,
-    IResult,
 };
 use std::borrow::Cow;
 
