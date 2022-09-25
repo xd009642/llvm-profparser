@@ -49,9 +49,10 @@ pub fn parse_bytes(data: &[u8]) -> io::Result<InstrumentationProfile> {
             "Unsupported instrumentation profile format",
         ));
     };
-    nom_res
-        .map(|(_bytes, res)| res)
-        .map_err(|e| io::Error::new(io::ErrorKind::Other, "Parsing failed"))
+    nom_res.map(|(_bytes, res)| res).map_err(|e| {
+        println!("{}", e);
+        io::Error::new(io::ErrorKind::Other, "Parsing failed")
+    })
 }
 
 pub trait InstrProfReader {
