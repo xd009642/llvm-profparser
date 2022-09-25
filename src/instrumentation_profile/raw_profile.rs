@@ -3,11 +3,12 @@ use crate::instrumentation_profile::*;
 use crate::util::parse_string_ref;
 use core::hash::Hash;
 use nom::bytes::complete::take;
+use nom::error::ParseError;
 use nom::lib::std::ops::RangeFrom;
 use nom::number::streaming::{u16 as nom_u16, u32 as nom_u32, u64 as nom_u64};
 use nom::number::Endianness;
 use nom::{
-    error::{Error, ErrorKind},
+    error::{ContextError, ErrorKind},
     Err, IResult,
 };
 use nom::{InputIter, InputLength, Slice};
@@ -138,7 +139,7 @@ pub trait MemoryWidthExt:
 {
     const MAGIC: u64;
 
-    fn nom_parse_fn<I>(endianness: Endianness) -> fn(_: I) -> IResult<I, Self>
+    fn nom_parse_fn<I>(endianness: Endianness) -> fn(_: I) -> IResult<I, Self, VerboseError<I>>
     where
         I: Slice<RangeFrom<usize>> + InputIter<Item = u8> + InputLength;
 }
@@ -153,7 +154,7 @@ impl MemoryWidthExt for u32 {
         | ('R' as u64) << 8
         | 129;
 
-    fn nom_parse_fn<I>(endianness: Endianness) -> fn(_: I) -> IResult<I, Self>
+    fn nom_parse_fn<I>(endianness: Endianness) -> fn(_: I) -> IResult<I, Self, VerboseError<I>>
     where
         I: Slice<RangeFrom<usize>> + InputIter<Item = u8> + InputLength,
     {
@@ -170,7 +171,7 @@ impl MemoryWidthExt for u64 {
         | ('r' as u64) << 8
         | 129;
 
-    fn nom_parse_fn<I>(endianness: Endianness) -> fn(_: I) -> IResult<I, Self>
+    fn nom_parse_fn<I>(endianness: Endianness) -> fn(_: I) -> IResult<I, Self, VerboseError<I>>
     where
         I: Slice<RangeFrom<usize>> + InputIter<Item = u8> + InputLength,
     {
@@ -202,7 +203,7 @@ where
         data: &ProfileData<T>,
         counter_offset: i64,
         mut bytes: &'a [u8],
-    ) -> IResult<&'a [u8], InstrProfRecord> {
+    ) -> ParseResult<'a, InstrProfRecord> {
         let max_counters = header.max_counters_len();
         // From LLVM coverage mapping version 8 relative counter offsets are allowed which can be
         // signed
@@ -216,7 +217,19 @@ where
             || counter_offset > max_counters
             || counter_offset + data.num_counters as i64 > max_counters
         {
-            Err(Err::Failure(Error::new(bytes, ErrorKind::Satisfy)))
+            //Err(Err::Failure(Error::new(bytes, ErrorKind::Satisfy))) TODO
+            Err(Err::Failure(VerboseError::from_error_kind(
+                bytes,
+                ErrorKind::Satisfy,
+            )))
+        } else if counter_offset as usize > bytes.len() {
+            let pos = &bytes[bytes.len()..];
+            let inner = VerboseError::from_error_kind(pos, ErrorKind::Eof);
+            Err(Err::Failure(VerboseError::add_context(
+                pos,
+                "end of file reached before counters offset",
+                inner,
+            )))
         } else {
             let mut counts = Vec::<u64>::new();
             counts.reserve(data.num_counters as usize);
@@ -246,7 +259,7 @@ where
         data: &ProfileData<T>,
         bytes: &'a [u8],
         _record: &mut InstrProfRecord,
-    ) -> IResult<&'a [u8], ()> {
+    ) -> ParseResult<'a, ()> {
         // record clear value data
         if data.num_value_sites.iter().all(|x| *x == 0) {
             // Okay so there's no value profiling data. So the next byte is actually a header
@@ -265,7 +278,7 @@ where
 {
     type Header = Header;
 
-    fn parse_bytes(mut input: &[u8]) -> IResult<&[u8], InstrumentationProfile> {
+    fn parse_bytes(mut input: &[u8]) -> ParseResult<InstrumentationProfile> {
         if !input.is_empty() {
             let mut result = InstrumentationProfile::default();
             let (bytes, header) = Self::parse_header(input)?;
@@ -278,6 +291,12 @@ where
                 result.is_byte_coverage = header.has_byte_coverage();
                 result.fn_entry_only = header.function_entry_only();
                 result.memory_profiling = header.memory_profile();
+            }
+            if bytes.len() < header.binary_ids_len as usize {
+                return Err(nom::Err::Failure(VerboseError::from_error_kind(
+                    &bytes[bytes.len()..],
+                    ErrorKind::Eof,
+                )));
             }
             input = &bytes[(header.binary_ids_len as usize)..];
             let mut data_section = vec![];
@@ -352,7 +371,7 @@ where
         }
     }
 
-    fn parse_header(input: &[u8]) -> IResult<&[u8], Self::Header> {
+    fn parse_header(input: &[u8]) -> ParseResult<Self::Header> {
         if Self::has_format(input) {
             let endianness = file_endianness::<T>(&input[..8].try_into().unwrap());
             let (bytes, version) = nom_u64(endianness)(&input[8..])?;
@@ -385,7 +404,11 @@ where
             };
             Ok((bytes, result))
         } else {
-            Err(Err::Failure(Error::new(input, ErrorKind::IsNot)))
+            //Err(Err::Failure(Error::new(input, ErrorKind::IsNot)))
+            Err(Err::Failure(VerboseError::from_error_kind(
+                input,
+                ErrorKind::IsNot,
+            )))
         }
     }
 
@@ -404,7 +427,7 @@ impl<T> ProfileData<T>
 where
     T: MemoryWidthExt,
 {
-    fn parse(bytes: &[u8], endianness: Endianness) -> IResult<&[u8], Self> {
+    fn parse(bytes: &[u8], endianness: Endianness) -> IResult<&[u8], Self, VerboseError<&[u8]>> {
         let parse = T::nom_parse_fn(endianness);
 
         let (bytes, name_ref) = nom_u64(endianness)(bytes)?;

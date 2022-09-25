@@ -7,13 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Added
 - `InstrumenationProfile::is_empty` to detect when there are no records
+- Fuzzing module for profile files
 
 ### Changed
 - Added anyhow and use in place of `Result<T, Box<dyn Error>>`
+- Make error type for profiles `VerboseError`
 
 ### Fixed
 - Handle merging of completely disjoint records - now profiles generated from multiple
 applications are accurately merged
+- Handle invalid Hash enum variant in `IndexedProfile`
 
 ## [0.2.0] - 2022-09-11
 ### Changed

@@ -1,6 +1,9 @@
-use crate::instrumentation_profile::types::*;
+use crate::instrumentation_profile::{types::*, ParseResult};
 use indexmap::IndexMap;
-use nom::{number::complete::*, IResult};
+use nom::{
+    error::{ErrorKind, ParseError, VerboseError, VerboseErrorKind},
+    number::complete::*,
+};
 use std::borrow::Cow;
 
 #[derive(Copy, Clone, Debug)]
@@ -12,26 +15,43 @@ struct KeyDataLen {
 #[derive(Clone, Debug)]
 pub(crate) struct HashTable(pub IndexMap<(u64, String), InstrProfRecord>);
 
-fn read_key_data_len(input: &[u8]) -> IResult<&[u8], KeyDataLen> {
+fn read_key_data_len(input: &[u8]) -> ParseResult<KeyDataLen> {
     let (bytes, key_len) = le_u64(input)?;
     let (bytes, data_len) = le_u64(bytes)?;
     let res = KeyDataLen { key_len, data_len };
     Ok((bytes, res))
 }
 
-fn read_key(input: &[u8], key_len: usize) -> IResult<&[u8], Cow<'_, str>> {
-    let res = String::from_utf8_lossy(&input[..key_len]);
-    Ok((&input[key_len..], res))
+fn read_key(input: &[u8], key_len: usize) -> ParseResult<Cow<'_, str>> {
+    if key_len > input.len() {
+        Err(nom::Err::Failure(VerboseError::from_error_kind(
+            &input[input.len()..],
+            ErrorKind::Eof,
+        )))
+    } else {
+        let res = String::from_utf8_lossy(&input[..key_len]);
+        Ok((&input[key_len..], res))
+    }
 }
 
 fn read_value(
     version: u64,
     mut input: &[u8],
     data_len: usize,
-) -> IResult<&[u8], (u64, InstrProfRecord)> {
+) -> ParseResult<(u64, InstrProfRecord)> {
     if data_len % 8 != 0 {
         // Element is corrupted, it should be aligned
-        todo!();
+        let errors = vec![(
+            input,
+            VerboseErrorKind::Context("table data length is not 8 byte aligned"),
+        )];
+        return Err(nom::Err::Failure(VerboseError { errors }));
+    }
+    if input.len() < data_len {
+        return Err(nom::Err::Failure(VerboseError::from_error_kind(
+            &input[input.len()..],
+            ErrorKind::Eof,
+        )));
     }
     let mut result = vec![];
     let end_len = input.len() - data_len;
@@ -102,12 +122,12 @@ impl HashTable {
     /// buckets is the data the hash table buckets start at - the start of the `HashTable` in memory.
     /// hash. offset shows the offset from the base address to the start of the `HashTable` as this
     /// will be used to correct any offsets
-    pub(crate) fn parse(
+    pub(crate) fn parse<'a>(
         version: u64,
-        input: &[u8],
+        input: &'a [u8],
         _offset: usize,
         bucket_start: usize,
-    ) -> IResult<&[u8], Self> {
+    ) -> ParseResult<'a, Self> {
         assert!(bucket_start > 0);
         let (bytes, _num_buckets) = le_u64(&input[bucket_start..])?;
         let (_bytes, mut num_entries) = le_u64(bytes)?;
@@ -126,7 +146,7 @@ impl HashTable {
         version: u64,
         input: &'a [u8],
         mut num_entries: u64,
-    ) -> IResult<&'a [u8], u64> {
+    ) -> ParseResult<'a, u64> {
         let (bytes, num_items_in_bucket) = le_u16(input)?;
         let mut remaining = bytes;
         for _i in 0..num_items_in_bucket {

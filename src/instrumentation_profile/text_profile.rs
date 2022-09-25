@@ -1,5 +1,5 @@
 use crate::instrumentation_profile::types::*;
-use crate::instrumentation_profile::InstrProfReader;
+use crate::instrumentation_profile::{InstrProfReader, ParseResult};
 use nom::branch::alt;
 use nom::bytes::complete::{tag, tag_no_case, take_until, take_while1};
 use nom::character::{
@@ -7,7 +7,7 @@ use nom::character::{
     is_digit, is_hex_digit,
 };
 use nom::combinator::eof;
-use nom::error::{Error, ErrorKind};
+use nom::error::{ErrorKind, ParseError, VerboseError};
 use nom::multi::*;
 use nom::sequence::*;
 use nom::*;
@@ -47,7 +47,7 @@ fn str_to_digit(bytes: &[u8]) -> u64 {
         .unwrap_or_default()
 }
 
-fn read_hexadecimal(input: &[u8]) -> IResult<&[u8], u64> {
+fn read_hexadecimal(input: &[u8]) -> ParseResult<u64> {
     preceded(alt((tag(b"0x"), tag(b"0X"))), take_while1(is_hex_digit))(input).map(|(b, v)| unsafe {
         // We know this is okay because it's just the bytes that pass `is_hex_digit`
         (
@@ -63,11 +63,11 @@ fn valid_name_char(character: u8) -> bool {
     c.is_ascii() && c != '\n' && c != '\r'
 }
 
-fn strip_whitespace(s: &[u8]) -> IResult<&[u8], ()> {
+fn strip_whitespace(s: &[u8]) -> ParseResult<()> {
     one_of(&b" \n\r\t"[..])(s).map(|(b, _)| (b, ()))
 }
 
-fn strip_comments(s: &[u8]) -> IResult<&[u8], ()> {
+fn strip_comments(s: &[u8]) -> ParseResult<()> {
     delimited(
         tag(b"#"),
         alt((take_until("\r"), take_until("\n"))),
@@ -76,11 +76,11 @@ fn strip_comments(s: &[u8]) -> IResult<&[u8], ()> {
     .map(|(b, _)| (b, ()))
 }
 
-fn skip_to_content(s: &[u8]) -> IResult<&[u8], ()> {
+fn skip_to_content(s: &[u8]) -> ParseResult<()> {
     many0(alt((strip_whitespace, strip_comments)))(s).map(|(b, _)| (b, ()))
 }
 
-fn match_header_tags(s: &[u8]) -> IResult<&[u8], &[u8]> {
+fn match_header_tags(s: &[u8]) -> ParseResult<&[u8]> {
     alt((
         tag_no_case(IR_TAG),
         tag_no_case(FE_TAG),
@@ -91,45 +91,58 @@ fn match_header_tags(s: &[u8]) -> IResult<&[u8], &[u8]> {
     ))(s)
 }
 
-fn parse_header_tags(s: &[u8]) -> IResult<&[u8], Vec<&[u8]>> {
+fn parse_header_tags(s: &[u8]) -> ParseResult<Vec<&[u8]>> {
     many0(delimited(tag(b":"), match_header_tags, line_ending))(s)
 }
 
-fn read_line(s: &[u8]) -> IResult<&[u8], &[u8]> {
+fn read_line(s: &[u8]) -> ParseResult<&[u8]> {
     tuple((take_while1(valid_name_char), line_ending))(s).map(|(b, (v, _))| (b, v))
 }
 
-fn read_decimal(s: &[u8]) -> IResult<&[u8], u64> {
+fn read_decimal(s: &[u8]) -> ParseResult<u64> {
     tuple((take_while1(is_digit), alt((line_ending, eof))))(s).map(|(b, v)| (b, str_to_digit(v.0)))
 }
 
-fn read_digit(s: &[u8]) -> IResult<&[u8], u64> {
+fn read_digit(s: &[u8]) -> ParseResult<u64> {
     alt((read_decimal, read_hexadecimal))(s)
 }
 
-fn indirect_value_site(s: &[u8]) -> IResult<&[u8], (&[u8], u64)> {
+fn indirect_value_site(s: &[u8]) -> ParseResult<(&[u8], u64)> {
     tuple((take_until(":"), tag(":"), take_while1(is_digit)))(s)
         .map(|(b, v)| (b, (v.0, str_to_digit(v.2))))
 }
 
-fn memop_value_site(s: &[u8]) -> IResult<&[u8], (u64, u64)> {
+fn memop_value_site(s: &[u8]) -> ParseResult<(u64, u64)> {
     tuple((take_while1(is_digit), tag(":"), take_while1(is_digit)))(s)
         .map(|(b, v)| (b, (str_to_digit(v.0), str_to_digit(v.2))))
 }
 
-fn read_value_profile_data(mut input: &[u8]) -> IResult<&[u8], Option<Box<ValueProfDataRecord>>> {
+fn read_value_profile_data(mut input: &[u8]) -> ParseResult<Option<Box<ValueProfDataRecord>>> {
     if let Ok((bytes, n_kinds)) = read_digit(input) {
         let mut record = Box::new(ValueProfDataRecord::default());
         // We have value profiling data!
         if n_kinds == 0 || n_kinds > ValueKind::len() as u64 {
             // TODO I am malformed
-            todo!()
+            return Err(nom::Err::Failure(VerboseError::from_error_kind(
+                bytes,
+                ErrorKind::Satisfy,
+            )));
         }
         input = bytes;
         for _i in 0..n_kinds {
             let (bytes, _) = skip_to_content(input)?;
-            let (bytes, kind) = read_digit(bytes)?;
-            let (bytes, _) = skip_to_content(bytes)?;
+            let (bytes2, kind) = read_digit(bytes)?;
+            let kind = match kind {
+                0 => ValueKind::IndirectCallTarget,
+                1 => ValueKind::MemOpSize,
+                _ => {
+                    return Err(nom::Err::Failure(VerboseError::from_error_kind(
+                        bytes,
+                        ErrorKind::OneOf,
+                    )));
+                }
+            };
+            let (bytes, _) = skip_to_content(bytes2)?;
             let (bytes, n_sites) = match read_digit(bytes) {
                 Ok(s) => s,
                 Err(_) => {
@@ -137,13 +150,6 @@ fn read_value_profile_data(mut input: &[u8]) -> IResult<&[u8], Option<Box<ValueP
                     continue;
                 }
             };
-            // TODO is there a tidier way to go from discriminant to enum
-            let kind = match kind {
-                0 => ValueKind::IndirectCallTarget,
-                1 => ValueKind::MemOpSize,
-                _ => todo!(),
-            };
-            // let mut sites = vec![];
             input = bytes;
             for _j in 0..n_sites {
                 let (bytes, _) = skip_to_content(input)?;
@@ -184,7 +190,7 @@ fn read_value_profile_data(mut input: &[u8]) -> IResult<&[u8], Option<Box<ValueP
 
 impl InstrProfReader for TextInstrProf {
     type Header = Header;
-    fn parse_bytes(mut input: &[u8]) -> IResult<&[u8], InstrumentationProfile> {
+    fn parse_bytes(mut input: &[u8]) -> ParseResult<InstrumentationProfile> {
         let (bytes, header) = Self::parse_header(input)?;
         let (bytes, _) = skip_to_content(bytes)?;
         input = bytes;
@@ -245,7 +251,7 @@ impl InstrProfReader for TextInstrProf {
         Ok((bytes, result))
     }
 
-    fn parse_header(input: &[u8]) -> IResult<&[u8], Self::Header> {
+    fn parse_header(input: &[u8]) -> ParseResult<Self::Header> {
         let (input, _) = skip_to_content(input)?;
         let (bytes, names) = parse_header_tags(input)?;
         let mut is_ir_level = false;
@@ -260,7 +266,11 @@ impl InstrProfReader for TextInstrProf {
             } else if check_tag(name, ENTRY_TAG) {
                 entry_first = true;
             } else if !check_tag(name, FE_TAG) {
-                return Err(Err::Failure(Error::new(bytes, ErrorKind::Tag)));
+                // return Err(Err::Failure(Error::new(bytes, ErrorKind::Tag)));
+                return Err(Err::Failure(VerboseError::from_error_kind(
+                    bytes,
+                    ErrorKind::Tag,
+                )));
             }
         }
         Ok((
