@@ -15,6 +15,7 @@ use nom::{InputIter, InputLength, Slice};
 use std::convert::TryInto;
 use std::fmt::{Debug, Display};
 use std::mem::size_of;
+use tracing::debug;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub enum RawProfileError {
@@ -302,6 +303,7 @@ where
             let mut data_section = vec![];
             for _ in 0..header.data_len {
                 let (bytes, data) = ProfileData::<T>::parse(input, header.endianness)?;
+                debug!("Parsed data section {:?}", data);
                 data_section.push(data);
                 input = bytes;
             }
@@ -326,6 +328,7 @@ where
                     0
                 };
                 let (bytes, record) = Self::read_raw_counts(&header, data, counters_offset, input)?;
+                debug!("Read counter record {:?}", record);
                 total_offset +=
                     counters_offset + (record.counts.len() * header.counter_size()) as i64;
                 counters_delta -= data.len() as u64;
@@ -343,6 +346,7 @@ where
                 let (new_bytes, names) = parse_string_ref(input)?;
                 input = new_bytes;
                 for name in names.split(INSTR_PROF_NAME_SEP) {
+                    debug!("Symbol name parsed: {}", name);
                     symtab.add_func_name(name.to_string(), Some(header.endianness));
                 }
             }
@@ -359,6 +363,7 @@ where
                 } else {
                     None
                 };
+                debug!("Parsed record: {:?} {:?} {:?}", name, hash, record);
                 result
                     .records
                     .push(NamedInstrProfRecord { name, hash, record });
@@ -402,6 +407,7 @@ where
                 names_delta,
                 value_kind_last,
             };
+            debug!("Read header {:?}", result);
             Ok((bytes, result))
         } else {
             //Err(Err::Failure(Error::new(input, ErrorKind::IsNot)))

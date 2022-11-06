@@ -5,6 +5,7 @@ use nom::{
     number::complete::*,
 };
 use std::borrow::Cow;
+use tracing::debug;
 
 #[derive(Copy, Clone, Debug)]
 struct KeyDataLen {
@@ -129,8 +130,10 @@ impl HashTable {
         bucket_start: usize,
     ) -> ParseResult<'a, Self> {
         assert!(bucket_start > 0);
-        let (bytes, _num_buckets) = le_u64(&input[bucket_start..])?;
+        let (bytes, num_buckets) = le_u64(&input[bucket_start..])?;
+        debug!("Number of hashtable buckets: {}", num_buckets);
         let (_bytes, mut num_entries) = le_u64(bytes)?;
+        debug!("Number of entries: {}", num_entries);
         let mut payload = input;
         let mut result = Self::new();
         while num_entries > 0 {
@@ -148,12 +151,16 @@ impl HashTable {
         mut num_entries: u64,
     ) -> ParseResult<'a, u64> {
         let (bytes, num_items_in_bucket) = le_u16(input)?;
+        debug!("Number of items in bucket: {}", num_items_in_bucket);
         let mut remaining = bytes;
         for _i in 0..num_items_in_bucket {
             let (bytes, _hash) = le_u64(remaining)?;
+            debug!("Hash(?): {}", _hash);
             let (bytes, lens) = read_key_data_len(bytes)?;
             let (bytes, key) = read_key(bytes, lens.key_len as usize)?;
+            debug!("lengths: {:?} and key: {}", lens, key);
             let (bytes, (hash, value)) = read_value(version, bytes, lens.data_len as usize)?;
+            debug!("hash: {}, value: {:?}", hash, value);
             self.0.insert((hash, key.to_string()), value);
             assert!(num_entries > 0);
             num_entries -= 1;
