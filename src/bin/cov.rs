@@ -3,7 +3,7 @@ use llvm_profparser::*;
 use std::fs;
 use std::path::PathBuf;
 use structopt::StructOpt;
-use tracing_subscriber::filter::EnvFilter;
+use tracing_subscriber::filter::filter_fn;
 use tracing_subscriber::{Layer, Registry};
 
 #[derive(Clone, Debug, Eq, PartialEq, StructOpt)]
@@ -78,9 +78,12 @@ impl ShowCommand {
 }
 
 fn enable_debug_logging() -> anyhow::Result<()> {
-    let filter = EnvFilter::new("cov=debug,llvm_profparser=debug");
     let fmt = tracing_subscriber::fmt::Layer::default();
-    let subscriber = filter.and_then(fmt).with_subscriber(Registry::default());
+    let subscriber = fmt
+        .with_filter(filter_fn(|metadata| {
+            metadata.target().contains("llvm_profparser")
+        }))
+        .with_subscriber(Registry::default());
     tracing::subscriber::set_global_default(subscriber)?;
     Ok(())
 }
