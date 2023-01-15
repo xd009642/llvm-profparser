@@ -3,6 +3,8 @@ use llvm_profparser::*;
 use std::fs;
 use std::path::PathBuf;
 use structopt::StructOpt;
+use tracing_subscriber::filter::filter_fn;
+use tracing_subscriber::{Layer, Registry};
 
 #[derive(Clone, Debug, Eq, PartialEq, StructOpt)]
 pub struct Opts {
@@ -32,10 +34,16 @@ pub struct ShowCommand {
     /// order `source,dest`
     #[structopt(long = "path-equivalence")]
     path_remapping: Option<PathRemapping>,
+    /// Turn on debug logging
+    #[structopt(long)]
+    debug: bool,
 }
 
 impl ShowCommand {
     fn run(&self) -> Result<()> {
+        if self.debug {
+            let _ = enable_debug_logging();
+        }
         let instr_prof = if self.instr_profile.len() == 1 {
             parse(&self.instr_profile[0])?
         } else if self.instr_profile.len() > 1 {
@@ -67,6 +75,17 @@ impl ShowCommand {
         }
         Ok(())
     }
+}
+
+fn enable_debug_logging() -> anyhow::Result<()> {
+    let fmt = tracing_subscriber::fmt::Layer::default();
+    let subscriber = fmt
+        .with_filter(filter_fn(|metadata| {
+            metadata.target().contains("llvm_profparser")
+        }))
+        .with_subscriber(Registry::default());
+    tracing::subscriber::set_global_default(subscriber)?;
+    Ok(())
 }
 
 fn main() -> Result<()> {

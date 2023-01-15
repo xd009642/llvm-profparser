@@ -11,6 +11,7 @@ use std::error::Error;
 use std::fmt;
 use std::fs;
 use std::path::{Path, PathBuf};
+use tracing::debug;
 
 /// Stores the instrumentation profile and information from the coverage mapping sections in the
 /// object files in order to construct a coverage report. Inspired, from the LLVM implementation
@@ -72,21 +73,29 @@ pub fn read_object_file(object: &Path, version: u64) -> Result<CoverageMappingIn
             LlvmSection::CoverageFunctions,
         ))??;
 
+    debug!("Parsed covfun section: {:?}", cov_fun);
+
     let cov_map = object_file
         .section_by_name("__llvm_covmap")
         .or(object_file.section_by_name(".lcovmap"))
         .map(|x| parse_coverage_mapping(object_file.endianness(), &x, version))
         .ok_or(SectionReadError::MissingSection(LlvmSection::CoverageMap))??;
 
+    debug!("Parsed covmap section: {:?}", cov_map);
+
     let prof_counts = object_file
         .section_by_name("__llvm_prf_cnts")
         .or(object_file.section_by_name(".lprfc"))
         .and_then(|x| parse_profile_counters(object_file.endianness(), &x).ok());
 
+    debug!("Parsed prf_cnts: {:?}", prof_counts);
+
     let prof_data = object_file
         .section_by_name("__llvm_prf_data")
         .or(object_file.section_by_name(".lprfd"))
         .and_then(|x| parse_profile_data(object_file.endianness(), &x).ok());
+
+    debug!("Parsed prf_data section: {:?}", prof_data);
 
     Ok(CoverageMappingInfo {
         cov_map,
@@ -499,7 +508,7 @@ fn parse_profile_counters(
 /// The equivalent llvm function is `RawCoverageMappingReader::decodeCounter`. This makes it
 /// stateless as I don't want to be maintaining an expression vector and clearing it and
 /// repopulating for every function record.
-fn parse_counter(input: u64, exprs: &mut [Expression]) -> Counter {
+fn parse_counter(input: u64, exprs: &mut Vec<Expression>) -> Counter {
     let ty = (Counter::ENCODING_TAG_MASK & input) as u8;
     let id = input >> 2; // For zero we don't actually care about this but we'll still do it
     let kind = match ty {
@@ -511,7 +520,16 @@ fn parse_counter(input: u64, exprs: &mut [Expression]) -> Counter {
             } else {
                 ExprKind::Add
             };
-            exprs[id as usize].set_kind(expr_kind);
+            let id = id as usize;
+            if exprs.len() <= id {
+                debug!(
+                    "Not enough expressions resizing {}->{}",
+                    exprs.len(),
+                    id + 1
+                );
+                exprs.resize(id + 1, Expression::default());
+            }
+            exprs[id].set_kind(expr_kind);
             CounterType::Expression(expr_kind)
         }
         _ => unreachable!(),

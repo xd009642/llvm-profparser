@@ -7,6 +7,8 @@ use std::cmp::Ordering;
 use std::collections::BinaryHeap;
 use std::path::PathBuf;
 use structopt::StructOpt;
+use tracing_subscriber::filter::filter_fn;
+use tracing_subscriber::{Layer, Registry};
 
 #[derive(Clone, Debug, Eq, PartialEq, StructOpt)]
 pub enum Command {
@@ -80,6 +82,9 @@ pub struct ShowCommand {
     /// only usable when the sample profile is in extbinary format
     #[structopt(long = "show_section_info_only")]
     show_section_info_only: bool,
+    /// Turn on debug logging
+    #[structopt(long)]
+    debug: bool,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, StructOpt)]
@@ -96,6 +101,9 @@ pub struct MergeCommand {
     /// Number of merge threads to use (will autodetect by default)
     #[structopt(long = "num-threads", short = "j")]
     jobs: Option<usize>,
+    /// Turn on debug logging
+    #[structopt(long)]
+    debug: bool,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, StructOpt)]
@@ -119,12 +127,25 @@ pub struct OverlapCommand {
     /// Generate a sparse profile
     #[structopt(long = "sparse")]
     sparse: bool,
+    /// Turn on debug logging
+    #[structopt(long)]
+    debug: bool,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, StructOpt)]
 pub struct Opts {
     #[structopt(subcommand)]
     cmd: Command,
+}
+
+impl Opts {
+    fn debug(&self) -> bool {
+        match &self.cmd {
+            &Command::Show { ref show } => show.debug,
+            &Command::Merge { ref merge } => merge.debug,
+            &Command::Overlap { ref overlap } => overlap.debug,
+        }
+    }
 }
 
 fn try_parse_weighted(input: &str) -> Result<(u64, String), String> {
@@ -371,8 +392,22 @@ impl MergeCommand {
     }
 }
 
+fn enable_debug_logging() -> anyhow::Result<()> {
+    let fmt = tracing_subscriber::fmt::Layer::default();
+    let subscriber = fmt
+        .with_filter(filter_fn(|metadata| {
+            metadata.target().contains("llvm_profparser")
+        }))
+        .with_subscriber(Registry::default());
+    tracing::subscriber::set_global_default(subscriber)?;
+    Ok(())
+}
+
 fn main() -> Result<()> {
     let opts = Opts::from_args();
+    if opts.debug() {
+        let _ = enable_debug_logging();
+    }
     match opts.cmd {
         Command::Show { show } => show.run(),
         Command::Merge { merge } => merge.run(),

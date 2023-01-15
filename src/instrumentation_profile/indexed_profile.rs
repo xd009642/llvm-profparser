@@ -9,6 +9,7 @@ use nom::{
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::io::Read;
+use tracing::debug;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub struct IndexedInstrProf;
@@ -156,12 +157,15 @@ impl InstrProfReader for IndexedInstrProf {
 
     fn parse_bytes(mut input: &[u8]) -> ParseResult<InstrumentationProfile> {
         let (bytes, header) = Self::parse_header(input)?;
-        let (bytes, _summary) = parse_summary(bytes, &header, false)?;
-        let (bytes, _cs_summary) = if header.is_csir_prof() {
+        debug!("Parsed header: {:?}", header);
+        let (bytes, summary) = parse_summary(bytes, &header, false)?;
+        debug!("Summary: {:?}", summary);
+        let (bytes, cs_summary) = if header.is_csir_prof() {
             parse_summary(bytes, &header, true)?
         } else {
             (bytes, None)
         };
+        debug!("cs_summary: {:?}", cs_summary);
         let mut profile = InstrumentationProfile {
             version: Some(header.version),
             has_csir: header.is_csir_prof(),
@@ -176,6 +180,7 @@ impl InstrProfReader for IndexedInstrProf {
             table_start,
             header.hash_offset as usize - table_start,
         )?;
+        debug!("Function hash table: {:?}", table);
         input = bytes;
         for ((hash, name), v) in &table.0 {
             let name = name.to_string();
@@ -187,6 +192,7 @@ impl InstrProfReader for IndexedInstrProf {
                 hash: Some(*hash),
                 record: v.clone(),
             };
+            debug!("Parsed record {:?}", record);
             profile.records.push(record);
         }
         Ok((input, profile))
