@@ -307,7 +307,7 @@ where
                 data_section.push(data);
                 input = bytes;
             }
-            let (bytes, _) = take(header.padding_bytes_before_counters)(input)?;
+            let (bytes, _) = take(header.padding_bytes_before_counters as usize)(input)?;
             input = bytes;
             let mut counters = vec![];
             let mut counters_delta = header.counters_delta;
