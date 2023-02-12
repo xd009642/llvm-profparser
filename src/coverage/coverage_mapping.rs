@@ -5,6 +5,7 @@ use crate::util::*;
 use anyhow::{bail, Result};
 use nom::error::Error as NomError;
 use object::{Endian, Endianness, Object, ObjectSection, Section};
+use rayon::prelude::*;
 use std::collections::HashMap;
 use std::convert::TryInto;
 use std::error::Error;
@@ -107,14 +108,15 @@ pub fn read_object_file(object: &Path, version: u64) -> Result<CoverageMappingIn
 
 impl<'a> CoverageMapping<'a> {
     pub fn new(object_files: &[PathBuf], profile: &'a InstrumentationProfile) -> Result<Self> {
-        let mut mapping_info = vec![];
         let version = match profile.version() {
             Some(v) => v,
             None => bail!("Invalid profile instrumentation, no version number provided"),
         };
-        for file in object_files {
-            mapping_info.push(read_object_file(file.as_path(), version)?);
-        }
+        let mapping_info = object_files
+            .par_iter()
+            .map(|file| read_object_file(file.as_path(), version))
+            .collect::<Result<Vec<_>, _>>()?;
+
         Ok(Self {
             profile,
             mapping_info,
