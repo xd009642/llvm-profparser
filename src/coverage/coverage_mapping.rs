@@ -297,8 +297,8 @@ fn parse_coverage_functions(
     endian: Endianness,
     section: &Section<'_, '_>,
 ) -> Result<Vec<FunctionRecordV3>, SectionReadError> {
-    if let Ok(data) = section.data() {
-        let mut bytes = data;
+    if let Ok(original_data) = section.data() {
+        let mut bytes = original_data;
         let mut res = vec![];
         let section_len = bytes.len();
         while !bytes.is_empty() {
@@ -323,6 +323,7 @@ fn parse_coverage_functions(
                 filename_indices.push(id);
                 bytes = data;
             }
+
             let (data, expr_len) = parse_leb128::<NomError<_>>(bytes).unwrap();
             let expr_len = expr_len as usize;
             bytes = data;
@@ -406,8 +407,8 @@ fn parse_mapping_regions<'a>(
                         Ok(RegionKind::Code) | Ok(RegionKind::Skipped) => {}
                         Ok(RegionKind::Branch) => {
                             kind = RegionKind::Branch;
-                            let (_data, c1) = parse_leb128(bytes)?;
-                            let (data, c2) = parse_leb128(bytes)?;
+                            let (data, c1) = parse_leb128(bytes)?;
+                            let (data, c2) = parse_leb128(data)?;
 
                             counter = parse_counter(c1, expressions);
                             false_count = parse_counter(c2, expressions);
