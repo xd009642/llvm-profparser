@@ -18,8 +18,9 @@ jobs:
         with:
           toolchain: ${{ matrix.version }}
           override: true
-          components: rustfmt, llvm-tools-preview
+          components: llvm-tools-preview
       - name: code-coverage
         run: |
+          cargo install cargo-binutils
           cargo install  --version 0.19.1 cargo-tarpaulin
           cargo tarpaulin --force-clean --exclude-files tests/data/* --follow-exec --coveralls ${{ secrets.CODECOV_TOKEN }}
