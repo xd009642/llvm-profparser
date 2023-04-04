@@ -358,15 +358,19 @@ where
                     Self::read_value_profiling_data(&header, data, input, &mut record)?;
                 input = bytes;
                 let name = symtab.names.get(&data.name_ref).cloned();
-                let hash = if name.is_some() {
-                    Some(data.func_hash)
+                let (hash, name_hash) = if let Some(ref name) = name {
+                    (Some(data.func_hash), Some(compute_hash(name)))
                 } else {
-                    None
+                    (None, None)
                 };
                 debug!("Parsed record: {:?} {:?} {:?}", name, hash, record);
-                result
-                    .records
-                    .push(NamedInstrProfRecord { name, hash, record });
+
+                result.records.push(NamedInstrProfRecord {
+                    name,
+                    name_hash,
+                    hash,
+                    record,
+                });
             }
             result.symtab = symtab;
             Ok((input, result))

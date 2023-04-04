@@ -187,8 +187,11 @@ impl InstrProfReader for IndexedInstrProf {
             profile
                 .symtab
                 .add_func_name(name.clone(), Some(Endianness::Little));
+
+            let name_hash = compute_hash(&name);
             let record = NamedInstrProfRecord {
                 name: Some(name),
+                name_hash: Some(name_hash),
                 hash: Some(*hash),
                 record: v.clone(),
             };
