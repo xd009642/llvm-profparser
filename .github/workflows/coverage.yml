@@ -17,6 +17,8 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ matrix.version }}
+          override: true
+          components: rustfmt, llvm-tools-preview
       - name: code-coverage
         run: |
           cargo install  --version 0.19.1 cargo-tarpaulin
