@@ -128,8 +128,7 @@ impl<'a> CoverageMapping<'a> {
         let mut result = HashMap::new();
         result.insert(Counter::default(), 0);
         let record = self.profile.records.iter().find(|x| {
-            x.hash == Some(func.header.fn_hash)
-                && Some(func.header.name_hash) == x.name.as_ref().map(compute_hash)
+            x.hash == Some(func.header.fn_hash) && Some(func.header.name_hash) == x.name_hash
         });
         if let Some(func_record) = record.as_ref() {
             for (id, count) in func_record.record.counts.iter().enumerate() {

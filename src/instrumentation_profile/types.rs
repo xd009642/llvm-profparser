@@ -210,6 +210,7 @@ impl InstrumentationProfile {
 #[derive(Clone, Debug, Default, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub struct NamedInstrProfRecord {
     pub name: Option<String>,
+    pub name_hash: Option<u64>,
     pub hash: Option<u64>,
     pub record: InstrProfRecord,
 }
