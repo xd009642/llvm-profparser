@@ -1,6 +1,5 @@
 use llvm_profparser::{merge_profiles, parse, parse_bytes};
 use pretty_assertions::assert_eq;
-use std::collections::HashSet;
 use std::ffi::OsStr;
 use std::fs::read_dir;
 use std::path::PathBuf;
@@ -65,8 +64,8 @@ fn check_merge_command(files: &[PathBuf], id: &str) {
             llvm_merged.has_csir_level_profile(),
             rust_merged.has_csir_level_profile()
         );
-        let llvm_records = llvm_merged.records.iter().collect::<HashSet<_>>();
-        let rust_records = rust_merged.records.iter().collect::<HashSet<_>>();
+        let rust_records = rust_merged.records.records().iter().collect::<Vec<_>>();
+        let llvm_records = llvm_merged.records.records().iter().collect::<Vec<_>>();
         assert!(!llvm_records.is_empty());
         std::assert_eq!(llvm_records, rust_records);
     } else {
@@ -165,8 +164,8 @@ fn check_against_text(ext: &OsStr) {
                 text_prof.has_csir_level_profile(),
                 parsed_prof.has_csir_level_profile()
             );
-            let text_records = text_prof.records.iter().collect::<HashSet<_>>();
-            let parse_records = parsed_prof.records.iter().collect::<HashSet<_>>();
+            let text_records = text_prof.records.iter().collect::<Vec<_>>();
+            let parse_records = parsed_prof.records.iter().collect::<Vec<_>>();
             assert_eq!(text_records, parse_records);
         } else {
             println!("{} failed", raw_file.path().display());

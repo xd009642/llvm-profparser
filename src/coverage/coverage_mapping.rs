@@ -127,11 +127,12 @@ impl<'a> CoverageMapping<'a> {
     pub(crate) fn get_simple_counters(&self, func: &FunctionRecordV3) -> HashMap<Counter, i64> {
         let mut result = HashMap::new();
         result.insert(Counter::default(), 0);
-        let record = self.profile.records.iter().find(|x| {
-            x.hash == Some(func.header.fn_hash) && Some(func.header.name_hash) == x.name_hash
-        });
-        if let Some(func_record) = record.as_ref() {
-            for (id, count) in func_record.record.counts.iter().enumerate() {
+        let record = self
+            .profile
+            .records
+            .get_by_hashes(&(func.header.name_hash, func.header.fn_hash));
+        if let Some(record) = record {
+            for (id, count) in record.record.counts.iter().enumerate() {
                 result.insert(Counter::instrumentation(id as u64), *count as i64);
             }
         }
