@@ -1,6 +1,6 @@
 use nom::number::Endianness;
 use std::cmp::Ordering;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::convert::TryInto;
 use std::fmt;
 
@@ -95,7 +95,7 @@ impl fmt::Display for InstrumentationLevel {
     }
 }
 
-#[derive(Debug, Default, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
+#[derive(Debug, Default, Clone, Eq, PartialEq)]
 pub struct InstrumentationProfile {
     pub(crate) version: Option<u64>,
     pub(crate) has_csir: bool,
@@ -104,8 +104,98 @@ pub struct InstrumentationProfile {
     pub(crate) is_byte_coverage: bool,
     pub(crate) fn_entry_only: bool,
     pub(crate) memory_profiling: bool,
-    pub records: Vec<NamedInstrProfRecord>,
+    pub records: NamedInstrProfRecords,
     pub symtab: Symtab,
+}
+
+#[derive(Debug, Default, Clone, Eq, PartialEq)]
+pub struct NamedInstrProfRecords {
+    records: Vec<NamedInstrProfRecord>,
+    by_name: HashMap<String, usize>,
+    by_name_hash: HashMap<u64, usize>,
+    by_fn_hash: HashMap<u64, usize>,
+    by_hashes: HashMap<(u64, u64), usize>,
+}
+
+impl NamedInstrProfRecords {
+    pub fn records(&self) -> &Vec<NamedInstrProfRecord> {
+        &self.records
+    }
+
+    pub fn iter(&self) -> std::slice::Iter<NamedInstrProfRecord> {
+        self.records.iter()
+    }
+
+    pub fn records_mut(&mut self) -> &mut Vec<NamedInstrProfRecord> {
+        &mut self.records
+    }
+
+    pub fn get_by_name(&self, name: &str) -> Option<&NamedInstrProfRecord> {
+        self.by_name.get(name).map(|i| &self.records[*i])
+    }
+
+    pub fn get_by_name_mut(&mut self, name: &str) -> Option<&mut NamedInstrProfRecord> {
+        match self.by_name.get(name) {
+            Some(i) => Some(&mut self.records[*i]),
+            None => None,
+        }
+    }
+
+    pub fn get_by_hashes(&self, hashes: &(u64, u64)) -> Option<&NamedInstrProfRecord> {
+        self.by_hashes.get(hashes).map(|i| &self.records[*i])
+    }
+
+    pub fn get_by_hashes_mut(&mut self, hashes: &(u64, u64)) -> Option<&mut NamedInstrProfRecord> {
+        match self.by_hashes.get(hashes) {
+            Some(i) => Some(&mut self.records[*i]),
+            None => None,
+        }
+    }
+
+    pub fn push(&mut self, named_record: NamedInstrProfRecord) {
+        let index = self.len();
+        match &named_record {
+            NamedInstrProfRecord {
+                name: Some(name),
+                hash: Some(hash),
+                name_hash,
+                ..
+            } => {
+                let name_hash = name_hash.unwrap_or_else(|| compute_hash(name));
+                self.by_name.insert(name.clone(), index);
+                self.by_name_hash.insert(name_hash, index);
+                self.by_fn_hash.insert(*hash, index);
+                self.by_hashes.insert((name_hash, *hash), index);
+            }
+            NamedInstrProfRecord {
+                name: Some(name),
+                hash: None,
+                name_hash,
+                ..
+            } => {
+                let name_hash = name_hash.unwrap_or_else(|| compute_hash(name));
+                self.by_name.insert(name.clone(), index);
+                self.by_name_hash.insert(name_hash, index);
+            }
+            NamedInstrProfRecord {
+                name: None,
+                hash: Some(hash),
+                ..
+            } => {
+                self.by_fn_hash.insert(*hash, index);
+            }
+            _ => {}
+        }
+        self.records.push(named_record);
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.records.is_empty()
+    }
+
+    pub fn len(&self) -> usize {
+        self.records.len()
+    }
 }
 
 impl InstrumentationProfile {
@@ -156,18 +246,18 @@ impl InstrumentationProfile {
         if self.version.is_none() && other.version.is_some() {
             self.version = other.version;
         }
-        for func in &other.records {
+        for func in other.records.records() {
             self.merge_record(func);
         }
     }
 
     pub fn merge_record(&mut self, record: &NamedInstrProfRecord) {
-        if let Some(name) = record.name.as_ref() {
+        if let Some(name) = &record.name {
             let hash = compute_hash(name);
             let added = if self.symtab.contains(hash) {
                 // Find the record and merge things. 0 hashed records should have no counters in the
                 // code and otherwise we'll ignore the change that truncated md5 hashes can collide
-                if let Some(rec) = self.records.iter_mut().find(|x| x.name == record.name) {
+                if let Some(rec) = &mut self.records.get_by_name_mut(name) {
                     rec.record.merge(&record.record);
                     true
                 } else {
@@ -175,7 +265,7 @@ impl InstrumentationProfile {
                 }
             } else if let Some(alt_hash) = record.hash {
                 if self.symtab.contains(alt_hash) {
-                    if let Some(rec) = self.records.iter_mut().find(|x| x.name == record.name) {
+                    if let Some(rec) = &mut self.records.get_by_name_mut(name) {
                         rec.record.merge(&record.record);
                         true
                     } else {
@@ -196,9 +286,7 @@ impl InstrumentationProfile {
 
     /// Gets the instrumentation record for the give function
     pub fn get_record(&self, name: &str) -> Option<&NamedInstrProfRecord> {
-        self.records
-            .iter()
-            .find(|x| x.name.as_deref() == Some(name))
+        self.records.get_by_name(name)
     }
 
     /// Returns true if there are no instrumentation records associated with the profile
@@ -207,7 +295,7 @@ impl InstrumentationProfile {
     }
 }
 
-#[derive(Clone, Debug, Default, Eq, PartialEq, Hash, Ord, PartialOrd)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Ord, PartialOrd)]
 pub struct NamedInstrProfRecord {
     pub name: Option<String>,
     pub name_hash: Option<u64>,
