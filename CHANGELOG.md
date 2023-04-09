@@ -6,7 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Changed
-- Removed another redundant hash computation
+- Removed another two redundant hash computations
 
 ## [0.3.3] - 2023-04-04
 ### Changed

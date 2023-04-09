@@ -48,3 +48,11 @@ required-features = ["cli"]
 [[bench]]
 name =  "profraw_parsing"
 harness = false
+
+[[bench]]
+name =  "profdata_parsing"
+harness = false
+
+[[bench]]
+name =  "report_merging"
+harness = false
