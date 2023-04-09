@@ -1,5 +1,4 @@
 use anyhow::Result;
-use llvm_profparser::instrumentation_profile::stats::*;
 use llvm_profparser::instrumentation_profile::summary::*;
 use llvm_profparser::instrumentation_profile::types::*;
 use llvm_profparser::*;
@@ -40,12 +39,6 @@ pub struct ShowCommand {
     /// Show instr profile data in text dump format
     #[structopt(long = "text")]
     text: bool,
-    /// Show indirect call site target values for shown functions
-    #[structopt(long = "ic-targets")]
-    ic_targets: bool,
-    /// Show the profiled sizes of the memory intrinsic call for shown functions"
-    #[structopt(long = "memop-sizes")]
-    memop_sizes: bool,
     /// Show detailed profile summary
     #[structopt(long = "show_detailed_summary")]
     show_detailed_summary: bool,
@@ -204,7 +197,6 @@ impl ShowCommand {
     pub fn run(&self) -> Result<()> {
         let profile = parse(&self.input)?;
         let mut summary = ProfileSummary::new();
-        let mut stats = vec![ValueSiteStats::default(); ValueKind::len()];
 
         let is_ir_instr = profile.is_ir_level_profile();
         let mut hotties =
@@ -278,26 +270,6 @@ impl ShowCommand {
                     };
                     println!("    Function count: {}", counts);
                 }
-                if self.ic_targets {
-                    println!(
-                        "    Indirect Call Site Count: {}",
-                        func.num_value_sites(ValueKind::IndirectCallTarget)
-                    );
-                    stats[ValueKind::IndirectCallTarget as usize].traverse_sites(
-                        &func.record,
-                        ValueKind::IndirectCallTarget,
-                        Some(&profile.symtab),
-                    );
-                }
-                let num_memop_calls = func.num_value_sites(ValueKind::MemOpSize);
-                if self.memop_sizes && num_memop_calls > 0 {
-                    println!("    Number of Memory Intrinsics Calls: {}", num_memop_calls);
-                    stats[ValueKind::MemOpSize as usize].traverse_sites(
-                        &func.record,
-                        ValueKind::MemOpSize,
-                        None,
-                    );
-                }
                 if self.show_counts {
                     let start = if is_ir_instr { 0 } else { 1 };
                     let counts = func
@@ -308,12 +280,6 @@ impl ShowCommand {
                         .collect::<Vec<String>>()
                         .join(", ");
                     println!("    Block counts: [{}]", counts);
-                }
-                if self.ic_targets {
-                    println!("    Indirect Target Results:");
-                }
-                if self.memop_sizes && num_memop_calls > 0 {
-                    println!("    Memory Intrinsic Size Results:");
                 }
             }
         }
@@ -359,16 +325,6 @@ impl ShowCommand {
             for f in hotties.iter() {
                 println!("  {}, max count = {}", f.name, f.count);
             }
-        }
-
-        if self.ic_targets && shown_funcs > 0 {
-            println!("Statistics for indirect call sites profile:");
-            println!("{}", stats[ValueKind::IndirectCallTarget as usize]);
-        }
-
-        if self.memop_sizes && shown_funcs > 0 {
-            println!("Statistics for memory instrinsic calls sizes profile:");
-            println!("{}", stats[ValueKind::MemOpSize as usize]);
         }
 
         if self.show_detailed_summary {
