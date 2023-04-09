@@ -10,7 +10,6 @@ use std::path::Path;
 
 pub mod indexed_profile;
 pub mod raw_profile;
-pub mod stats;
 pub mod summary;
 pub mod text_profile;
 pub mod types;
