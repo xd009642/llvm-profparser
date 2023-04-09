@@ -358,8 +358,8 @@ where
                     Self::read_value_profiling_data(&header, data, input, &mut record)?;
                 input = bytes;
                 let name = symtab.names.get(&data.name_ref).cloned();
-                let (hash, name_hash) = if let Some(ref name) = name {
-                    (Some(data.func_hash), Some(compute_hash(name)))
+                let (hash, name_hash) = if symtab.contains(data.name_ref) {
+                    (Some(data.func_hash), Some(data.name_ref))
                 } else {
                     (None, None)
                 };
