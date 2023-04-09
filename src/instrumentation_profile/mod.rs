@@ -8,7 +8,6 @@ use std::io;
 use std::io::prelude::*;
 use std::path::Path;
 
-pub mod binary_writer;
 pub mod indexed_profile;
 pub mod raw_profile;
 pub mod stats;
