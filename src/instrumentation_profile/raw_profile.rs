@@ -359,6 +359,11 @@ where
                 input = bytes;
                 let name = symtab.names.get(&data.name_ref).cloned();
                 let (hash, name_hash) = if symtab.contains(data.name_ref) {
+                    // Previously this function calculated the function hash itself to be
+                    // ultra-defensive against the profraw format changing hash calculation method
+                    // so we try not to rely on reimplementing it. However, md5::compute was more
+                    // expensive than initially assumed and using the precomputed one reduces
+                    // runtime by 25% on benchmarks
                     (Some(data.func_hash), Some(data.name_ref))
                 } else {
                     (None, None)
