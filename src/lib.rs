@@ -1,4 +1,5 @@
 use crate::instrumentation_profile::types::InstrumentationProfile;
+use rayon::prelude::*;
 use std::path::Path;
 
 pub mod coverage;
@@ -23,19 +24,20 @@ pub enum ProfileFormat {
 
 pub fn merge_profiles<T>(files: &[T]) -> std::io::Result<InstrumentationProfile>
 where
-    T: AsRef<Path>,
+    T: AsRef<Path> + Sync + Send,
 {
     if files.is_empty() {
         Ok(InstrumentationProfile::default())
     } else {
-        let mut profiles = vec![];
-        for input in files {
-            let profile = parse(input)?;
-            profiles.push(profile);
-        }
-        let mut base = profiles.remove(0);
-        for profile in &profiles {
-            base.merge(profile);
+        let mut profiles = files
+            .par_iter()
+            .map(|input| parse(input))
+            .collect::<Vec<_>>();
+
+        let mut base = profiles.remove(0)?;
+        for profile in profiles.drain(..) {
+            let profile = profile?;
+            base.merge(&profile);
         }
         Ok(base)
     }
