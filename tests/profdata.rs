@@ -1,10 +1,52 @@
 use llvm_profparser::{merge_profiles, parse, parse_bytes};
-use pretty_assertions::assert_eq;
-use std::collections::HashSet;
+use serde::Deserialize;
+use std::collections::{HashMap, HashSet};
 use std::ffi::OsStr;
 use std::fs::read_dir;
 use std::path::PathBuf;
 use std::process::Command;
+
+/*
+Counters:
+  simple_loops:
+    Hash: 0x00046d109c4436d1
+    Counters: 4
+    Function count: 1
+    Block counts: [100, 100, 75]
+
+    Instrumentation level: Front-end
+Functions shown: 12
+Total functions: 12
+Maximum function count: 1
+Maximum internal block count: 100
+ */
+
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+struct Output {
+    #[serde(rename = "Counters", default)]
+    counters: HashMap<String, Entry>,
+    #[serde(rename = "Instrumentation level")]
+    instrumentation_level: Option<String>,
+    #[serde(rename = "Functions shown")]
+    functions_shown: Option<usize>,
+    #[serde(rename = "Total functions")]
+    total_functions: Option<usize>,
+    #[serde(rename = "Maximum function count")]
+    maximum_function_count: Option<usize>,
+    #[serde(rename = "Maximum internal block count")]
+    maximum_internal_block_count: Option<usize>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+struct Entry {
+    hash: Option<usize>,
+    counters: Option<usize>,
+    #[serde(rename = "Function count")]
+    function_count: Option<usize>,
+    #[serde(rename = "Block counts", default)]
+    block_counts: Vec<usize>,
+}
 
 fn data_root_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/profdata")
@@ -28,13 +70,6 @@ fn get_data_dir() -> PathBuf {
             data_root_dir()
         }
     }
-}
-
-fn get_printout(output: &[u8]) -> Vec<String> {
-    String::from_utf8_lossy(output)
-        .lines()
-        .map(|x| x.to_string())
-        .collect()
 }
 
 fn check_merge_command(files: &[PathBuf], id: &str) {
@@ -95,6 +130,8 @@ fn check_command(ext: &OsStr) {
             .output()
             .expect("cargo binutils or llvm-profdata is not installed");
 
+        let llvm_struct: Output = serde_yaml::from_slice(&llvm.stdout).unwrap();
+
         if llvm.status.success() {
             println!("Checking {:?}", raw_file.file_name());
             count += 1;
@@ -107,8 +144,9 @@ fn check_command(ext: &OsStr) {
                 .expect("Failed to run profparser on file");
             println!("{}", String::from_utf8_lossy(&rust.stderr));
 
-            assert_eq!(get_printout(&llvm.stdout), get_printout(&rust.stdout));
-            assert_eq!(get_printout(&llvm.stderr), get_printout(&rust.stderr));
+            let rust_struct: Output = serde_yaml::from_slice(&rust.stdout).unwrap();
+
+            assert_eq!(rust_struct, llvm_struct);
         } else {
             println!(
                 "LLVM tools failed:\n{}",
