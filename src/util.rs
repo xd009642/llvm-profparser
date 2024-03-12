@@ -5,6 +5,7 @@ use nom::{
 };
 use std::io::Read;
 use std::path::{Path, PathBuf};
+use tracing::debug;
 
 pub fn parse_leb128<'a, E>(mut input: &'a [u8]) -> IResult<&'a [u8], u64, E>
 where
@@ -31,6 +32,7 @@ where
     let (input, compressed_size) = parse_leb128::<E>(input)?;
     if compressed_size != 0 {
         if compressed_size as usize > input.len() {
+            debug!("Unexpected EOF parsing a string ref");
             Err(nom::Err::Error(E::from_error_kind(input, ErrorKind::Eof)))
         } else {
             let compressed_size = compressed_size as usize;
@@ -54,6 +56,7 @@ where
         match String::from_utf8(input[..uncompressed_size].to_vec()) {
             Ok(name) => Ok((&input[uncompressed_size..], name)),
             Err(_e) => {
+                debug!("Invalid UTF-8 string");
                 let inner = E::from_error_kind(input, ErrorKind::Satisfy);
                 Err(nom::Err::Error(E::add_context(
                     input,

@@ -15,7 +15,7 @@ use nom::{InputIter, InputLength, Slice};
 use std::convert::TryInto;
 use std::fmt::{Debug, Display};
 use std::mem::size_of;
-use tracing::debug;
+use tracing::{debug, trace, error};
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub enum RawProfileError {
@@ -65,6 +65,9 @@ pub struct Header {
     pub counters_delta: u64,
     pub names_delta: u64,
     pub value_kind_last: u64,
+    pub num_bitmap_bytes: u64,
+    pub padding_bytes_after_bitmap_bytes: u64,
+    pub bitmap_delta: u64,
 }
 
 impl Header {
@@ -113,11 +116,13 @@ pub struct ProfileData<T> {
     name_ref: u64,
     func_hash: u64,
     counter_ptr: T,
+    bitmap_ptr: Option<T>,
     function_addr: T,
     values_ptr_expr: T,
     num_counters: u32,
     /// This might just be two values?
     num_value_sites: [u16; ValueKind::MemOpSize as usize + 1],
+    num_bitmap_bytes: u32,
 }
 
 impl<T> ProfileData<T> {
@@ -209,6 +214,7 @@ where
         // From LLVM coverage mapping version 8 relative counter offsets are allowed which can be
         // signed
         // num 2 max 24 offset 7 counters len 3
+        trace!("Reading raw counts offset: {} max: {}. data {:?}", counter_offset, max_counters, data);
         if data.num_counters == 0
             || max_counters < 0
             || counter_offset < 0
@@ -218,6 +224,7 @@ where
             || counter_offset > max_counters
             || counter_offset + data.num_counters as i64 > max_counters
         {
+            error!("consistency check for reading counts failed");
             //Err(Err::Failure(Error::new(bytes, ErrorKind::Satisfy))) TODO
             Err(Err::Failure(VerboseError::from_error_kind(
                 bytes,
@@ -302,12 +309,18 @@ where
             input = &bytes[(header.binary_ids_len as usize)..];
             let mut data_section = vec![];
             for _ in 0..header.data_len {
-                let (bytes, data) = ProfileData::<T>::parse(input, header.endianness)?;
+                let (bytes, data) = ProfileData::<T>::parse(input, &header)?;
                 debug!("Parsed data section {:?}", data);
                 data_section.push(data);
                 input = bytes;
             }
-            let (bytes, _) = take(header.padding_bytes_before_counters as usize)(input)?;
+            let bytes = match take(header.padding_bytes_before_counters as usize)(input) {
+                Ok((b, _)) => b,
+                Err(e) => {
+                    error!("Failed to skip padding bytes");
+                    return Err(e);
+                }
+            };
             input = bytes;
             let mut counters = vec![];
             let mut counters_delta = header.counters_delta;
@@ -344,9 +357,10 @@ where
             let mut symtab = Symtab::default();
             while input.len() > end_length {
                 let (new_bytes, names) = parse_string_ref(input)?;
+                debug!("Complete names string: '{}'. Read {} bytes", names, input.len() - new_bytes.len());
                 input = new_bytes;
                 for name in names.split(INSTR_PROF_NAME_SEP) {
-                    debug!("Symbol name parsed: {}", name);
+                    debug!("Symbol name parsed: '{}'", name);
                     symtab.add_func_name(name.to_string(), Some(header.endianness));
                 }
             }
@@ -389,6 +403,7 @@ where
         if Self::has_format(input) {
             let endianness = file_endianness::<T>(&input[..8].try_into().unwrap());
             let (bytes, version) = nom_u64(endianness)(&input[8..])?;
+            debug!("Profraw version: {}", version & !VARIANT_MASKS_ALL);
             let (bytes, binary_ids_len) = if (version & !VARIANT_MASKS_ALL) >= 7 {
                 nom_u64(endianness)(bytes)?
             } else {
@@ -398,10 +413,29 @@ where
             let (bytes, padding_bytes_before_counters) = nom_u64(endianness)(bytes)?;
             let (bytes, counters_len) = nom_u64(endianness)(bytes)?;
             let (bytes, padding_bytes_after_counters) = nom_u64(endianness)(bytes)?;
+
+            
+            let (bytes, num_bitmap_bytes, padding_bytes_after_bitmap_bytes) = if (version & !VARIANT_MASKS_ALL) >= 9 {
+                let (bytes, num_bitmap_bytes) = nom_u64(endianness)(bytes)?;
+                let (bytes, num_bitmap_padding_bytes) = nom_u64(endianness)(bytes)?;
+                (bytes, num_bitmap_bytes, num_bitmap_padding_bytes)
+            } else {
+                (bytes, 0, 0)
+            };
+
             let (bytes, names_len) = nom_u64(endianness)(bytes)?;
             let (bytes, counters_delta) = nom_u64(endianness)(bytes)?;
+            
+            let (bytes, bitmap_delta) = if (version & !VARIANT_MASKS_ALL) >= 9 {
+                let (bytes, bitmap_delta) = nom_u64(endianness)(bytes)?;
+                (bytes, bitmap_delta)
+            } else {
+                (bytes, 0)
+            };
+
             let (bytes, names_delta) = nom_u64(endianness)(bytes)?;
             let (bytes, value_kind_last) = nom_u64(endianness)(bytes)?;
+
 
             let result = Header {
                 endianness,
@@ -415,6 +449,9 @@ where
                 counters_delta,
                 names_delta,
                 value_kind_last,
+                num_bitmap_bytes,
+                padding_bytes_after_bitmap_bytes,
+                bitmap_delta,
             };
             debug!("Read header {:?}", result);
             Ok((bytes, result))
@@ -442,17 +479,29 @@ impl<T> ProfileData<T>
 where
     T: MemoryWidthExt,
 {
-    fn parse(bytes: &[u8], endianness: Endianness) -> IResult<&[u8], Self, VerboseError<&[u8]>> {
+    fn parse<'a>(bytes: &'a [u8], header: &Header) -> IResult<&'a [u8], Self, VerboseError<&'a [u8]>> {
+        let endianness = header.endianness; 
         let parse = T::nom_parse_fn(endianness);
 
         let (bytes, name_ref) = nom_u64(endianness)(bytes)?;
         let (bytes, func_hash) = nom_u64(endianness)(bytes)?;
         let (bytes, counter_ptr) = parse(bytes)?;
+        let (bytes, bitmap_ptr) = if header.version > 8 {
+            let (bytes, bitmap_ptr) = parse(bytes)?;
+            (bytes, Some(bitmap_ptr))
+        } else {
+            (bytes, None)
+        };
         let (bytes, function_addr) = parse(bytes)?;
         let (bytes, values_ptr_expr) = parse(bytes)?;
         let (bytes, num_counters) = nom_u32(endianness)(bytes)?;
         let (bytes, value_0) = nom_u16(endianness)(bytes)?;
         let (bytes, value_1) = nom_u16(endianness)(bytes)?;
+        let (bytes, num_bitmap_bytes) = if header.version > 8 {
+            nom_u32(endianness)(bytes)?
+        } else {
+            (bytes, 0)
+        };
 
         Ok((
             bytes,
@@ -460,10 +509,12 @@ where
                 name_ref,
                 func_hash,
                 counter_ptr,
+                bitmap_ptr,
                 function_addr,
                 values_ptr_expr,
                 num_counters,
                 num_value_sites: [value_0, value_1],
+                num_bitmap_bytes,
             },
         ))
     }
