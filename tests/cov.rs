@@ -92,7 +92,8 @@ struct Run {
 fn run_coverage(project: &str) -> io::Result<Option<Run>> {
     let project = get_project_dir(project);
     let cargo_version = CargoVersionInfo::new()?;
-    let stable_coverage = (cargo_version.major == 1 && cargo_version.minor >= 60) || cargo_version.major > 1;
+    let stable_coverage =
+        (cargo_version.major == 1 && cargo_version.minor >= 60) || cargo_version.major > 1;
     let rustflags = match cargo_version.channel {
         Channel::Nightly if !stable_coverage => "-Zinstrument-coverage",
         _ => "-Cinstrument-coverage",
