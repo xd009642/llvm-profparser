@@ -11,7 +11,7 @@ use std::error::Error;
 use std::fmt;
 use std::fs;
 use std::path::{Path, PathBuf};
-use tracing::debug;
+use tracing::{debug, warn};
 
 /// Stores the instrumentation profile and information from the coverage mapping sections in the
 /// object files in order to construct a coverage report. Inspired, from the LLVM implementation
