@@ -460,7 +460,7 @@ fn parse_profile_data(
     if let Ok(data) = section.data() {
         let mut bytes = data;
         let mut res = vec![];
-        while !bytes.is_empty() {
+        while !bytes.len() >= 24 {
             let name_md5 = endian.read_u64_bytes(bytes[..8].try_into().unwrap());
             let structural_hash = endian.read_u64_bytes(bytes[8..16].try_into().unwrap());
 
@@ -480,6 +480,9 @@ fn parse_profile_data(
                 structural_hash,
                 counters_len,
             });
+        }
+        if !bytes.is_empty() {
+            warn!("{} bytes left in profile data", bytes.len());
         }
         Ok(res)
     } else {
