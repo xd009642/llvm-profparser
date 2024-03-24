@@ -346,7 +346,6 @@ where
             let mut total_offset = 0;
             let remaining_before_counters = input.len();
             for data in &data_section {
-                total_offset = 0; // MARKER
                 let counters_offset = if header.version() == 8 {
                     // Why oh why!?
                     (data.counter_ptr.into() as i64 - counters_delta as i64) - total_offset
