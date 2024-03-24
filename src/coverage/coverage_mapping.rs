@@ -460,7 +460,8 @@ fn parse_profile_data(
     if let Ok(data) = section.data() {
         let mut bytes = data;
         let mut res = vec![];
-        while bytes.len() >= 24 {
+        while !bytes.is_empty() {
+            // bytes.len() >= 24 {
             let name_md5 = endian.read_u64_bytes(bytes[..8].try_into().unwrap());
             let structural_hash = endian.read_u64_bytes(bytes[8..16].try_into().unwrap());
 

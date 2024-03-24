@@ -136,6 +136,7 @@ fn run_coverage(project: &str) -> io::Result<Option<Run>> {
 }
 
 fn compare_reports(run: &Run) {
+    println!("Comparing run reports for: {:?}", run);
     let profdata = run.profraw.parent().unwrap().join("default.profdata");
     let merge = Command::new("cargo")
         .args(&["profdata", "--", "merge", "-sparse", "-o"])
