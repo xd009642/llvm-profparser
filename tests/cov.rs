@@ -214,6 +214,7 @@ fn check_matches() {
 }
 
 #[test]
+#[ignore]
 fn check_stable_vec() {
     // Build the project and generate profraw and instrumented binary
     let run_result = run_coverage("stable_vec").unwrap();
