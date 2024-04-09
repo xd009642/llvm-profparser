@@ -87,6 +87,7 @@ fn parse_summary<'a>(
     if header.version() >= 4 {
         let (bytes, n_fields) = le_u64(input)?;
         let (bytes, n_entries) = le_u64(bytes)?;
+        debug!("n_fields: {} n_entries: {}", n_fields, n_entries);
         input = bytes;
         let mut fields = HashMap::new();
         for i in 0..n_fields {
@@ -96,12 +97,17 @@ fn parse_summary<'a>(
                 fields.insert(field, value);
             }
         }
+        debug!("Parsed fields: {:?}", fields);
         let mut detailed_summary = vec![];
         for _ in 0..n_entries {
             // Start getting the cutoffs
             let (bytes, cutoff) = le_u64(input)?;
             let (bytes, min_count) = le_u64(bytes)?;
             let (bytes, num_counts) = le_u64(bytes)?;
+            debug!(
+                "Cutoff {} min_count {} num_counts {}",
+                cutoff, min_count, num_counts
+            );
             input = bytes;
             detailed_summary.push(ProfileSummaryEntry {
                 cutoff,
