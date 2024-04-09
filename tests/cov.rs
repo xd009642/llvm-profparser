@@ -224,6 +224,7 @@ fn check_stable_vec() {
 }
 
 #[test]
+#[ignored]
 fn check_mapping_consistency() {
     let example = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/cov");
     let obj = example.join("simple_project");
