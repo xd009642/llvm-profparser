@@ -466,21 +466,26 @@ fn parse_profile_data(
             let structural_hash = endian.read_u64_bytes(bytes[8..16].try_into().unwrap());
 
             let _counter_ptr = endian.read_u64_bytes(bytes[16..24].try_into().unwrap());
-            bytes = &bytes[(24 + 16)..];
-            let counters_len = endian.read_u32_bytes(bytes[..4].try_into().unwrap());
-            // TODO Might need to get the counter offset and get the list of counters from this?
-            // And potentially check against the maximum number of counters just to make sure that
-            // it's not being exceeded?
-            //
-            // Also counters_len >= 1 so this should be checked to make sure it's not malformed
+            let counters_location = 24 +16;
+            if bytes.len() <= counters_location {
+                bytes = &bytes[counters_location..];
+                let counters_len = endian.read_u32_bytes(bytes[..4].try_into().unwrap());
+                // TODO Might need to get the counter offset and get the list of counters from this?
+                // And potentially check against the maximum number of counters just to make sure that
+                // it's not being exceeded?
+                //
+                // Also counters_len >= 1 so this should be checked to make sure it's not malformed
 
-            bytes = &bytes[8..];
+                bytes = &bytes[8..];
 
-            res.push(ProfileData {
-                name_md5,
-                structural_hash,
-                counters_len,
-            });
+                res.push(ProfileData {
+                    name_md5,
+                    structural_hash,
+                    counters_len,
+                });
+            } else {
+                bytes = &[];
+            }
         }
         if !bytes.is_empty() {
             warn!("{} bytes left in profile data", bytes.len());
