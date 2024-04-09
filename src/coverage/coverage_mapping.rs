@@ -466,7 +466,7 @@ fn parse_profile_data(
             let structural_hash = endian.read_u64_bytes(bytes[8..16].try_into().unwrap());
 
             let _counter_ptr = endian.read_u64_bytes(bytes[16..24].try_into().unwrap());
-            let counters_location = 24 +16;
+            let counters_location = 24 + 16;
             if bytes.len() <= counters_location {
                 bytes = &bytes[counters_location..];
                 let counters_len = endian.read_u32_bytes(bytes[..4].try_into().unwrap());
