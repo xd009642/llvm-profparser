@@ -136,10 +136,14 @@ impl HashTable {
         debug!("Number of entries: {}", num_entries);
         let mut payload = input;
         let mut result = Self::new();
-        while num_entries > 0 {
+        //TODO is this change right?
+        for _ in 0..num_buckets {
             let (bytes, entries) = result.parse_bucket(version, payload, num_entries)?;
             payload = bytes;
             num_entries = entries;
+            if num_entries <= 0 {
+                break;
+            }
         }
         Ok((payload, result))
     }
