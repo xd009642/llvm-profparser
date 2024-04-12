@@ -5,12 +5,11 @@ use crate::util::*;
 use anyhow::{bail, Result};
 use nom::error::Error as NomError;
 use object::{Endian, Endianness, Object, ObjectSection, Section};
-use std::collections::HashMap;
 use std::convert::TryInto;
 use std::error::Error;
 use std::fmt;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use tracing::{debug, warn};
 
 /// Stores the instrumentation profile and information from the coverage mapping sections in the

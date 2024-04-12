@@ -1,6 +1,5 @@
 use crate::coverage::*;
 use std::collections::BTreeMap;
-use std::path::PathBuf;
 use std::str::FromStr;
 use thiserror::Error;
 

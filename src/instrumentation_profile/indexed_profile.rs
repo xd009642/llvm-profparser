@@ -3,12 +3,11 @@ use crate::instrumentation_profile::*;
 use crate::summary::*;
 use anyhow::bail;
 use nom::{
-    error::{ContextError, ErrorKind, ParseError, VerboseError},
+    error::{ContextError, ErrorKind, ParseError},
     number::{complete::*, Endianness},
 };
 use std::collections::HashMap;
 use std::convert::TryFrom;
-use std::io::Read;
 use tracing::debug;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
