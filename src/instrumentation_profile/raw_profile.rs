@@ -505,7 +505,7 @@ where
         let (bytes, name_ref) = nom_u64(endianness)(bytes)?;
         let (bytes, func_hash) = nom_u64(endianness)(bytes)?;
         let (bytes, counter_ptr) = parse(bytes)?;
-        let (bytes, bitmap_ptr) = if header.version > 8 {
+        let (bytes, bitmap_ptr) = if header.version() > 8 {
             let (bytes, bitmap_ptr) = parse(bytes)?;
             (bytes, Some(bitmap_ptr))
         } else {
@@ -516,7 +516,7 @@ where
         let (bytes, num_counters) = nom_u32(endianness)(bytes)?;
         let (bytes, value_0) = nom_u16(endianness)(bytes)?;
         let (bytes, value_1) = nom_u16(endianness)(bytes)?;
-        let (bytes, num_bitmap_bytes) = if header.version > 8 {
+        let (bytes, num_bitmap_bytes) = if header.version() > 8 {
             nom_u32(endianness)(bytes)?
         } else {
             (bytes, 0)
