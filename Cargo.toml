@@ -50,11 +50,14 @@ required-features = ["cli"]
 [[bench]]
 name =  "profraw_parsing"
 harness = false
+path = "benches/profraw_parsing.rs"
 
 [[bench]]
 name =  "profdata_parsing"
 harness = false
+path = "benches/profdata_parsing.rs"
 
 [[bench]]
 name =  "report_merging"
 harness = false
+path = "benches/report_merging.rs"
