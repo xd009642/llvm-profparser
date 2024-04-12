@@ -3,12 +3,11 @@ use crate::instrumentation_profile::*;
 use crate::summary::*;
 use anyhow::bail;
 use nom::{
-    error::{ContextError, ErrorKind, ParseError, VerboseError},
+    error::{ContextError, ErrorKind, ParseError},
     number::{complete::*, Endianness},
 };
 use std::collections::HashMap;
 use std::convert::TryFrom;
-use std::io::Read;
 use tracing::debug;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
@@ -36,6 +35,9 @@ pub struct Header {
     version: u64,
     pub hash_type: HashType,
     pub hash_offset: u64,
+    pub mem_prof_offset: Option<u64>,
+    pub binary_id_offset: Option<u64>,
+    pub temporary_prof_traces_offset: Option<u64>,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Ord, PartialOrd, Hash)]
@@ -87,6 +89,7 @@ fn parse_summary<'a>(
     if header.version() >= 4 {
         let (bytes, n_fields) = le_u64(input)?;
         let (bytes, n_entries) = le_u64(bytes)?;
+        debug!("n_fields: {} n_entries: {}", n_fields, n_entries);
         input = bytes;
         let mut fields = HashMap::new();
         for i in 0..n_fields {
@@ -96,12 +99,17 @@ fn parse_summary<'a>(
                 fields.insert(field, value);
             }
         }
+        debug!("Parsed fields: {:?}", fields);
         let mut detailed_summary = vec![];
         for _ in 0..n_entries {
             // Start getting the cutoffs
             let (bytes, cutoff) = le_u64(input)?;
             let (bytes, min_count) = le_u64(bytes)?;
             let (bytes, num_counts) = le_u64(bytes)?;
+            debug!(
+                "Cutoff {} min_count {} num_counts {}",
+                cutoff, min_count, num_counts
+            );
             input = bytes;
             detailed_summary.push(ProfileSummaryEntry {
                 cutoff,
@@ -215,12 +223,33 @@ impl InstrProfReader for IndexedInstrProf {
                 ))
             })?;
             let (bytes, hash_offset) = le_u64(bytes)?;
+            let (bytes, mem_prof_offset) = if version >= 8 {
+                let (bytes, offset) = le_u64(bytes)?;
+                (bytes, Some(offset))
+            } else {
+                (bytes, None)
+            };
+            let (bytes, binary_id_offset) = if version >= 9 {
+                let (bytes, offset) = le_u64(bytes)?;
+                (bytes, Some(offset))
+            } else {
+                (bytes, None)
+            };
+            let (bytes, temporary_prof_traces_offset) = if version >= 10 {
+                let (bytes, offset) = le_u64(bytes)?;
+                (bytes, Some(offset))
+            } else {
+                (bytes, None)
+            };
             Ok((
                 bytes,
                 Self::Header {
                     version,
                     hash_type,
                     hash_offset,
+                    mem_prof_offset,
+                    binary_id_offset,
+                    temporary_prof_traces_offset,
                 },
             ))
         } else {

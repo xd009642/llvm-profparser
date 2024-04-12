@@ -136,6 +136,7 @@ impl HashTable {
         debug!("Number of entries: {}", num_entries);
         let mut payload = input;
         let mut result = Self::new();
+        //TODO is this change right?
         while num_entries > 0 {
             let (bytes, entries) = result.parse_bucket(version, payload, num_entries)?;
             payload = bytes;

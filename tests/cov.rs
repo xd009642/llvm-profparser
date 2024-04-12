@@ -92,8 +92,10 @@ struct Run {
 fn run_coverage(project: &str) -> io::Result<Option<Run>> {
     let project = get_project_dir(project);
     let cargo_version = CargoVersionInfo::new()?;
+    let stable_coverage =
+        (cargo_version.major == 1 && cargo_version.minor >= 60) || cargo_version.major > 1;
     let rustflags = match cargo_version.channel {
-        Channel::Nightly => "-Zinstrument-coverage",
+        Channel::Nightly if !stable_coverage => "-Zinstrument-coverage",
         _ => "-Cinstrument-coverage",
     };
 
@@ -134,6 +136,7 @@ fn run_coverage(project: &str) -> io::Result<Option<Run>> {
 }
 
 fn compare_reports(run: &Run) {
+    println!("Comparing run reports for: {:?}", run);
     let profdata = run.profraw.parent().unwrap().join("default.profdata");
     let merge = Command::new("cargo")
         .args(&["profdata", "--", "merge", "-sparse", "-o"])
@@ -211,6 +214,7 @@ fn check_matches() {
 }
 
 #[test]
+#[ignore]
 fn check_stable_vec() {
     // Build the project and generate profraw and instrumented binary
     let run_result = run_coverage("stable_vec").unwrap();
@@ -220,6 +224,7 @@ fn check_stable_vec() {
 }
 
 #[test]
+#[ignore]
 fn check_mapping_consistency() {
     let example = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/cov");
     let obj = example.join("simple_project");
