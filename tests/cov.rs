@@ -232,7 +232,7 @@ fn check_mapping_consistency() {
 
     let instr = parse(prof).unwrap();
 
-    let mapping = CoverageMapping::new(&[obj], &instr).unwrap();
+    let mapping = CoverageMapping::new(&[obj], &instr, false).unwrap();
     let info = &mapping.mapping_info[0];
     for record in &instr.records {
         let fun = info
