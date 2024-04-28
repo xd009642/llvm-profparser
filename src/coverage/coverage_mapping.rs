@@ -10,7 +10,7 @@ use std::error::Error;
 use std::fmt;
 use std::fs;
 use std::path::Path;
-use tracing::{debug, error, warn};
+use tracing::{debug, error, trace, warn};
 
 /// Stores the instrumentation profile and information from the coverage mapping sections in the
 /// object files in order to construct a coverage report. Inspired, from the LLVM implementation
@@ -178,9 +178,15 @@ impl<'a> CoverageMapping<'a> {
                     let rhs = region_ids.get(&expr.rhs);
                     match (lhs, rhs) {
                         (Some(lhs), Some(rhs)) => {
-                            let count = match expr.kind {
-                                ExprKind::Subtract => lhs - rhs,
-                                ExprKind::Add => lhs + rhs,
+                            let count: i64 = match expr.kind {
+                                ExprKind::Subtract => {
+                                    trace!("Subtracting counts: {} - {}", lhs, rhs);
+                                    lhs - rhs
+                                }
+                                ExprKind::Add => {
+                                    trace!("Adding counts: {} + {}", lhs, rhs);
+                                    lhs + rhs
+                                }
                             };
 
                             let counter = Counter {
