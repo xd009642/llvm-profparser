@@ -10,7 +10,7 @@ use std::error::Error;
 use std::fmt;
 use std::fs;
 use std::path::Path;
-use tracing::{debug, warn};
+use tracing::{debug, error, warn};
 
 /// Stores the instrumentation profile and information from the coverage mapping sections in the
 /// object files in order to construct a coverage report. Inspired, from the LLVM implementation
@@ -105,14 +105,26 @@ pub fn read_object_file(object: &Path, version: u64) -> Result<CoverageMappingIn
 }
 
 impl<'a> CoverageMapping<'a> {
-    pub fn new(object_files: &[PathBuf], profile: &'a InstrumentationProfile) -> Result<Self> {
+    pub fn new(
+        object_files: &[PathBuf],
+        profile: &'a InstrumentationProfile,
+        allow_parsing_failures: bool,
+    ) -> Result<Self> {
         let mut mapping_info = vec![];
         let version = match profile.version() {
             Some(v) => v,
             None => bail!("Invalid profile instrumentation, no version number provided"),
         };
         for file in object_files {
-            mapping_info.push(read_object_file(file.as_path(), version)?);
+            match read_object_file(file.as_path(), version) {
+                Ok(info) => mapping_info.push(info),
+                Err(e) => {
+                    error!("{} couldn't be interpretted: {}", file.display(), e);
+                    if !allow_parsing_failures {
+                        return Err(e);
+                    }
+                }
+            };
         }
         Ok(Self {
             profile,
@@ -295,6 +307,7 @@ fn parse_coverage_functions(
     endian: Endianness,
     section: &Section<'_, '_>,
 ) -> Result<Vec<FunctionRecordV3>, SectionReadError> {
+    debug!("Parsing coverage functions");
     if let Ok(original_data) = section.data() {
         let mut bytes = original_data;
         let mut res = vec![];
@@ -368,6 +381,7 @@ fn parse_coverage_functions(
         }
         Ok(res)
     } else {
+        error!("Can't read data for coverage function section");
         Err(SectionReadError::EmptySection(
             LlvmSection::CoverageFunctions,
         ))
