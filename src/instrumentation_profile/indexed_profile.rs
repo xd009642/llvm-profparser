@@ -6,7 +6,7 @@ use nom::{
     error::{ContextError, ErrorKind, ParseError},
     number::{complete::*, Endianness},
 };
-use std::collections::HashMap;
+use rustc_hash::FxHashMap;
 use std::convert::TryFrom;
 use tracing::debug;
 
@@ -91,7 +91,7 @@ fn parse_summary<'a>(
         let (bytes, n_entries) = le_u64(bytes)?;
         debug!("n_fields: {} n_entries: {}", n_fields, n_entries);
         input = bytes;
-        let mut fields = HashMap::new();
+        let mut fields = FxHashMap::default();
         for i in 0..n_fields {
             let (bytes, value) = le_u64(input)?;
             input = bytes;
