@@ -401,7 +401,7 @@ where
                 };
                 debug!("Parsed record: {:?} {:?} {:?}", name, hash, record);
 
-                result.records.push(NamedInstrProfRecord {
+                result.push_record(NamedInstrProfRecord {
                     name,
                     name_hash,
                     hash,

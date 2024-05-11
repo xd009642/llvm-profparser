@@ -204,7 +204,7 @@ impl InstrProfReader for IndexedInstrProf {
                 record: v.clone(),
             };
             debug!("Parsed record {:?}", record);
-            profile.records.push(record);
+            profile.push_record(record);
         }
         Ok((input, profile))
     }

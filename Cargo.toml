@@ -62,3 +62,9 @@ path = "benches/profdata_parsing.rs"
 name =  "report_merging"
 harness = false
 path = "benches/report_merging.rs"
+
+[profile.release]
+debug = true
+
+[profile.bench]
+debug = true

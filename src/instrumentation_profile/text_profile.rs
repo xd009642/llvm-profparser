@@ -235,7 +235,7 @@ impl InstrProfReader for TextInstrProf {
                 data,
             };
             let name = std::str::from_utf8(name).map(|x| x.to_string()).ok();
-            result.records.push(NamedInstrProfRecord {
+            result.push_record(NamedInstrProfRecord {
                 name: name.clone(),
                 name_hash: name.as_ref().map(compute_hash),
                 hash: Some(hash),

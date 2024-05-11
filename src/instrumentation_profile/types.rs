@@ -3,6 +3,7 @@ use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use std::convert::TryInto;
 use std::fmt;
+use rustc_hash::FxHashMap;
 
 /// ~VARIANT_MASKS_ALL & Header.version is the version number
 pub(crate) const VARIANT_MASKS_ALL: u64 = 0xff00_0000_0000_0000;
@@ -95,7 +96,7 @@ impl fmt::Display for InstrumentationLevel {
     }
 }
 
-#[derive(Debug, Default, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
+#[derive(Debug, Default, Clone, Eq, PartialEq)]
 pub struct InstrumentationProfile {
     pub(crate) version: Option<u64>,
     pub(crate) has_csir: bool,
@@ -105,6 +106,7 @@ pub struct InstrumentationProfile {
     pub(crate) fn_entry_only: bool,
     pub(crate) memory_profiling: bool,
     pub records: Vec<NamedInstrProfRecord>,
+    pub record_name_lookup: FxHashMap<String, usize>,
     pub symtab: Symtab,
 }
 
@@ -141,6 +143,29 @@ impl InstrumentationProfile {
         }
     }
 
+    pub fn records(&self) -> impl Iterator<Item=&NamedInstrProfRecord> {
+        self.records.iter()
+    }
+
+    pub fn push_record(&mut self, record: NamedInstrProfRecord) {
+        if let Some(name) = record.name.clone() {
+            self.record_name_lookup.insert(name, self.records.len());
+        }
+        self.records.push(record);
+    }
+
+    pub fn find_record_by_name(&self, name: &str) -> Option<&NamedInstrProfRecord> {
+        self.record_name_lookup.get(name).map(|x| &self.records[*x])
+    }
+
+    pub fn find_record_by_name_mut(&mut self, name: &str) -> Option<&mut NamedInstrProfRecord> {
+        if let Some(index) = self.record_name_lookup.get(name) {
+            Some(&mut self.records[*index])
+        } else {
+            None
+        }
+    }
+
     /// Byte coverage switches things around to make `0` equivalent to coverage and !0 uncovered it
     /// seems. This currently is not supported but also not output by any rust tools (to my
     /// knowledge)
@@ -166,7 +191,7 @@ impl InstrumentationProfile {
             let added = if self.symtab.contains(*hash) {
                 // Find the record and merge things. 0 hashed records should have no counters in the
                 // code and otherwise we'll ignore the change that truncated md5 hashes can collide
-                if let Some(rec) = self.records.iter_mut().find(|x| x.name == record.name) {
+                if let Some(rec) = record.name.as_ref().and_then(|x| self.find_record_by_name_mut(x)) {
                     rec.record.merge(&record.record);
                     true
                 } else {
@@ -174,7 +199,7 @@ impl InstrumentationProfile {
                 }
             } else if let Some(alt_hash) = record.hash {
                 if self.symtab.contains(alt_hash) {
-                    if let Some(rec) = self.records.iter_mut().find(|x| x.name == record.name) {
+                    if let Some(rec) = record.name.as_ref().and_then(|x| self.find_record_by_name_mut(x)) {
                         rec.record.merge(&record.record);
                         true
                     } else {
@@ -188,7 +213,7 @@ impl InstrumentationProfile {
             };
             if !added {
                 self.symtab.names.insert(*hash, record.name_unchecked());
-                self.records.push(record.clone());
+                self.push_record(record.clone());
             }
         }
     }
