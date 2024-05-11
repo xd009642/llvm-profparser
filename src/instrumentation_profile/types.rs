@@ -1,9 +1,9 @@
 use nom::number::Endianness;
+use rustc_hash::FxHashMap;
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use std::convert::TryInto;
 use std::fmt;
-use rustc_hash::FxHashMap;
 
 /// ~VARIANT_MASKS_ALL & Header.version is the version number
 pub(crate) const VARIANT_MASKS_ALL: u64 = 0xff00_0000_0000_0000;
@@ -143,7 +143,7 @@ impl InstrumentationProfile {
         }
     }
 
-    pub fn records(&self) -> impl Iterator<Item=&NamedInstrProfRecord> {
+    pub fn records(&self) -> impl Iterator<Item = &NamedInstrProfRecord> {
         self.records.iter()
     }
 
@@ -191,7 +191,11 @@ impl InstrumentationProfile {
             let added = if self.symtab.contains(*hash) {
                 // Find the record and merge things. 0 hashed records should have no counters in the
                 // code and otherwise we'll ignore the change that truncated md5 hashes can collide
-                if let Some(rec) = record.name.as_ref().and_then(|x| self.find_record_by_name_mut(x)) {
+                if let Some(rec) = record
+                    .name
+                    .as_ref()
+                    .and_then(|x| self.find_record_by_name_mut(x))
+                {
                     rec.record.merge(&record.record);
                     true
                 } else {
@@ -199,7 +203,11 @@ impl InstrumentationProfile {
                 }
             } else if let Some(alt_hash) = record.hash {
                 if self.symtab.contains(alt_hash) {
-                    if let Some(rec) = record.name.as_ref().and_then(|x| self.find_record_by_name_mut(x)) {
+                    if let Some(rec) = record
+                        .name
+                        .as_ref()
+                        .and_then(|x| self.find_record_by_name_mut(x))
+                    {
                         rec.record.merge(&record.record);
                         true
                     } else {
