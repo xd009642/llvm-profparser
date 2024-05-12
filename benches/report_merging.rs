@@ -14,6 +14,20 @@ pub fn merge_bench_profiles(c: &mut Criterion) {
         })
     });
 }
-criterion_group!(benches, merge_bench_profiles);
+
+pub fn merge_tarpaulin_profiles(c: &mut Criterion) {
+    let files = std::fs::read_dir("./benches/data/tarpaulin_profraws/")
+        .unwrap()
+        .map(|x| x.unwrap().path())
+        .collect::<Vec<_>>();
+
+    c.bench_function("big_merge", |b| {
+        b.iter(|| {
+            let _ = merge_profiles(black_box(&files));
+        })
+    });
+}
+
+criterion_group!(benches, merge_bench_profiles, merge_tarpaulin_profiles);
 
 criterion_main!(benches);

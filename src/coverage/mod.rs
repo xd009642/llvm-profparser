@@ -1,5 +1,5 @@
 use nom::IResult;
-use std::collections::HashMap;
+use rustc_hash::FxHashMap;
 use std::convert::TryFrom;
 use std::path::PathBuf;
 
@@ -8,7 +8,7 @@ pub mod reporting;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct CoverageMappingInfo {
-    pub cov_map: HashMap<u64, Vec<PathBuf>>,
+    pub cov_map: FxHashMap<u64, Vec<PathBuf>>,
     pub cov_fun: Vec<FunctionRecordV3>,
     pub prof_counts: Option<Vec<u64>>,
     pub prof_data: Option<Vec<ProfileData>>,

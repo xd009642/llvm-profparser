@@ -135,10 +135,10 @@ impl<'a> CoverageMapping<'a> {
     /// All counters of type `CounterKind::ProfileInstrumentation` can be used in function regions
     /// other than their own (particulary for functions which are only called from one location).
     /// This gathers them all to use as a base list of counters.
-    pub(crate) fn get_simple_counters(&self, func: &FunctionRecordV3) -> HashMap<Counter, i64> {
-        let mut result = HashMap::new();
+    pub(crate) fn get_simple_counters(&self, func: &FunctionRecordV3) -> FxHashMap<Counter, i64> {
+        let mut result = FxHashMap::default();
         result.insert(Counter::default(), 0);
-        let record = self.profile.records.iter().find(|x| {
+        let record = self.profile.records().iter().find(|x| {
             x.hash == Some(func.header.fn_hash) && Some(func.header.name_hash) == x.name_hash
         });
         if let Some(func_record) = record.as_ref() {
@@ -271,9 +271,9 @@ fn parse_coverage_mapping(
     endian: Endianness,
     section: &Section<'_, '_>,
     version: u64,
-) -> Result<HashMap<u64, Vec<PathBuf>>, SectionReadError> {
+) -> Result<FxHashMap<u64, Vec<PathBuf>>, SectionReadError> {
     if let Ok(mut data) = section.data() {
-        let mut result = HashMap::new();
+        let mut result = FxHashMap::default();
         while !data.is_empty() {
             let data_len = data.len();
             // Read the number of affixed function records (now just 0 as not in this header)

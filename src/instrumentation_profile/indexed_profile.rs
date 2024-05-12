@@ -6,7 +6,7 @@ use nom::{
     error::{ContextError, ErrorKind, ParseError},
     number::{complete::*, Endianness},
 };
-use std::collections::HashMap;
+use rustc_hash::FxHashMap;
 use std::convert::TryFrom;
 use tracing::debug;
 
@@ -91,7 +91,7 @@ fn parse_summary<'a>(
         let (bytes, n_entries) = le_u64(bytes)?;
         debug!("n_fields: {} n_entries: {}", n_fields, n_entries);
         input = bytes;
-        let mut fields = HashMap::new();
+        let mut fields = FxHashMap::default();
         for i in 0..n_fields {
             let (bytes, value) = le_u64(input)?;
             input = bytes;
@@ -174,12 +174,12 @@ impl InstrProfReader for IndexedInstrProf {
             (bytes, None)
         };
         debug!("cs_summary: {:?}", cs_summary);
-        let mut profile = InstrumentationProfile {
-            version: Some(header.version),
-            has_csir: header.is_csir_prof(),
-            is_ir: header.is_ir_prof(),
-            ..Default::default()
-        };
+        let mut profile = InstrumentationProfile::new(
+            Some(header.version),
+            header.is_csir_prof(),
+            header.is_ir_prof(),
+            false,
+        );
 
         let table_start = input.len() - bytes.len();
         let (bytes, table) = HashTable::parse(
@@ -204,7 +204,7 @@ impl InstrProfReader for IndexedInstrProf {
                 record: v.clone(),
             };
             debug!("Parsed record {:?}", record);
-            profile.records.push(record);
+            profile.push_record(record);
         }
         Ok((input, profile))
     }

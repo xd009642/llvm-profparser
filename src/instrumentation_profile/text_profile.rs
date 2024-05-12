@@ -194,12 +194,12 @@ impl InstrProfReader for TextInstrProf {
         let (bytes, header) = Self::parse_header(input)?;
         let (bytes, _) = skip_to_content(bytes)?;
         input = bytes;
-        let mut result = InstrumentationProfile {
-            has_csir: header.has_csir,
-            is_ir: header.is_ir_level,
-            is_entry_first: header.entry_first,
-            ..Default::default()
-        };
+        let mut result = InstrumentationProfile::new(
+            None,
+            header.has_csir,
+            header.is_ir_level,
+            header.entry_first,
+        );
         while !input.is_empty() {
             // function name (demangled)
             let (bytes, name) = read_line(input)?;
@@ -235,7 +235,7 @@ impl InstrProfReader for TextInstrProf {
                 data,
             };
             let name = std::str::from_utf8(name).map(|x| x.to_string()).ok();
-            result.records.push(NamedInstrProfRecord {
+            result.push_record(NamedInstrProfRecord {
                 name: name.clone(),
                 name_hash: name.as_ref().map(compute_hash),
                 hash: Some(hash),
@@ -373,11 +373,11 @@ mod tests {
         let (_buf, report) = TextInstrProf::parse_bytes(simple.as_bytes()).unwrap();
 
         assert_eq!(report.get_level(), InstrumentationLevel::FrontEnd);
-        assert_eq!(report.records.len(), 1);
+        assert_eq!(report.records().len(), 1);
         assert_eq!(report.symtab.len(), 1);
         assert_eq!(report.symtab.names.get(&0).unwrap(), "main");
 
-        let rec = &report.records[0];
+        let rec = &report.records()[0];
 
         assert_eq!(rec.name, Some("main".to_string()));
         assert_eq!(rec.hash, Some(0));
