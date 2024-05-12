@@ -204,7 +204,7 @@ impl ShowCommand {
         let mut shown_funcs = 0;
         let mut below_cutoff_funcs = 0;
         let topn = self.topn.unwrap_or_default();
-        for func in &profile.records {
+        for func in profile.records() {
             if func.name.is_none() || func.hash.is_none() {
                 continue;
             }

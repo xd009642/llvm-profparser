@@ -105,12 +105,22 @@ pub struct InstrumentationProfile {
     pub(crate) is_byte_coverage: bool,
     pub(crate) fn_entry_only: bool,
     pub(crate) memory_profiling: bool,
-    pub records: Vec<NamedInstrProfRecord>,
-    pub record_name_lookup: FxHashMap<String, usize>,
+    records: Vec<NamedInstrProfRecord>,
+    record_name_lookup: FxHashMap<String, usize>,
     pub symtab: Symtab,
 }
 
 impl InstrumentationProfile {
+    pub fn new(version: Option<u64>, has_csir: bool, is_ir: bool, is_entry_first: bool) -> Self {
+        Self {
+            version,
+            has_csir,
+            is_ir,
+            is_entry_first,
+            ..Default::default()
+        }
+    }
+
     pub fn version(&self) -> Option<u64> {
         self.version
     }

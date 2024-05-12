@@ -174,12 +174,12 @@ impl InstrProfReader for IndexedInstrProf {
             (bytes, None)
         };
         debug!("cs_summary: {:?}", cs_summary);
-        let mut profile = InstrumentationProfile {
-            version: Some(header.version),
-            has_csir: header.is_csir_prof(),
-            is_ir: header.is_ir_prof(),
-            ..Default::default()
-        };
+        let mut profile = InstrumentationProfile::new(
+            Some(header.version),
+            header.is_csir_prof(),
+            header.is_ir_prof(),
+            false,
+        );
 
         let table_start = input.len() - bytes.len();
         let (bytes, table) = HashTable::parse(
