@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+### Changed
+- Now use some hashmap based caching to speedup record lookup during profile merge.
+
 ## [0.5.0] - 2024-04-28
 ### Changed
 - Now allow binaries to fail parsing for the mapping information (depdendent on function argument)
