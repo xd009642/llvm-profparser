@@ -373,11 +373,11 @@ mod tests {
         let (_buf, report) = TextInstrProf::parse_bytes(simple.as_bytes()).unwrap();
 
         assert_eq!(report.get_level(), InstrumentationLevel::FrontEnd);
-        assert_eq!(report.records.len(), 1);
+        assert_eq!(report.records().len(), 1);
         assert_eq!(report.symtab.len(), 1);
         assert_eq!(report.symtab.names.get(&0).unwrap(), "main");
 
-        let rec = &report.records[0];
+        let rec = &report.records()[0];
 
         assert_eq!(rec.name, Some("main".to_string()));
         assert_eq!(rec.hash, Some(0));

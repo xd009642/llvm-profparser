@@ -153,8 +153,8 @@ impl InstrumentationProfile {
         }
     }
 
-    pub fn records(&self) -> impl Iterator<Item = &NamedInstrProfRecord> {
-        self.records.iter()
+    pub fn records(&self) -> &[NamedInstrProfRecord] {
+        &self.records
     }
 
     pub fn push_record(&mut self, record: NamedInstrProfRecord) {

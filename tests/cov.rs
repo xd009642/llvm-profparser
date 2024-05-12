@@ -234,7 +234,7 @@ fn check_mapping_consistency() {
 
     let mapping = CoverageMapping::new(&[obj], &instr, false).unwrap();
     let info = &mapping.mapping_info[0];
-    for record in &instr.records {
+    for record in instr.records() {
         let fun = info
             .cov_fun
             .iter()

@@ -138,7 +138,7 @@ impl<'a> CoverageMapping<'a> {
     pub(crate) fn get_simple_counters(&self, func: &FunctionRecordV3) -> FxHashMap<Counter, i64> {
         let mut result = FxHashMap::default();
         result.insert(Counter::default(), 0);
-        let record = self.profile.records().find(|x| {
+        let record = self.profile.records().iter().find(|x| {
             x.hash == Some(func.header.fn_hash) && Some(func.header.name_hash) == x.name_hash
         });
         if let Some(func_record) = record.as_ref() {

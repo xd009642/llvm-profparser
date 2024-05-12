@@ -104,8 +104,8 @@ fn check_merge_command(files: &[PathBuf], id: &str) {
             llvm_merged.has_csir_level_profile(),
             rust_merged.has_csir_level_profile()
         );
-        let llvm_records = llvm_merged.records.iter().collect::<HashSet<_>>();
-        let rust_records = rust_merged.records.iter().collect::<HashSet<_>>();
+        let llvm_records = llvm_merged.records().iter().collect::<HashSet<_>>();
+        let rust_records = rust_merged.records().iter().collect::<HashSet<_>>();
         assert!(!llvm_records.is_empty());
         std::assert_eq!(llvm_records, rust_records);
     } else {
@@ -207,8 +207,8 @@ fn check_against_text(ext: &OsStr) {
                 text_prof.has_csir_level_profile(),
                 parsed_prof.has_csir_level_profile()
             );
-            let text_records = text_prof.records.iter().collect::<HashSet<_>>();
-            let parse_records = parsed_prof.records.iter().collect::<HashSet<_>>();
+            let text_records = text_prof.records().iter().collect::<HashSet<_>>();
+            let parse_records = parsed_prof.records().iter().collect::<HashSet<_>>();
             assert_eq!(text_records, parse_records);
         } else {
             println!("{} failed", raw_file.path().display());
@@ -305,7 +305,7 @@ fn profraw_merging() {
     let merged = merge_profiles(&[premerge_1, premerge_2]).unwrap();
 
     assert_eq!(merged.symtab, expected_merged.symtab);
-    assert_eq!(merged.records, expected_merged.records);
+    assert_eq!(merged.records(), expected_merged.records());
 }
 
 #[test]
