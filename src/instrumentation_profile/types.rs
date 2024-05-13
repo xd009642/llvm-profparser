@@ -393,16 +393,6 @@ pub struct ValueProfRecord {
     site_count: u8,
 }
 
-impl ValueProfData {
-    fn deserialize_to(&self, _record: &mut InstrProfRecord, _symtab: Option<&Symtab>) {
-        if self.num_value_kinds == 0 {
-            return;
-        }
-
-        todo!()
-    }
-}
-
 impl PartialOrd for InstrProfValueData {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))

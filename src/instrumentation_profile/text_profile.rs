@@ -119,7 +119,7 @@ fn memop_value_site(s: &[u8]) -> ParseResult<(u64, u64)> {
 
 fn read_value_profile_data(mut input: &[u8]) -> ParseResult<Option<Box<ValueProfDataRecord>>> {
     if let Ok((bytes, n_kinds)) = read_digit(input) {
-        let mut record = Box::new(ValueProfDataRecord::default());
+        let mut record = Box::<ValueProfDataRecord>::default();
         // We have value profiling data!
         if n_kinds == 0 || n_kinds > ValueKind::len() as u64 {
             // TODO I am malformed

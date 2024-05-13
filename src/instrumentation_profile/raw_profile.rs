@@ -244,8 +244,7 @@ where
                 inner,
             )))
         } else {
-            let mut counts = Vec::<u64>::new();
-            counts.reserve(data.num_counters as usize);
+            let mut counts = Vec::<u64>::with_capacity(data.num_counters as usize);
             bytes = &bytes[(counter_offset as usize)..];
             for _ in 0..(data.num_counters as usize) {
                 let counter = if header.has_byte_coverage() {

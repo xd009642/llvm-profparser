@@ -38,7 +38,7 @@ where
             let compressed_size = compressed_size as usize;
             let mut decoder = ZlibDecoder::new(&input[..compressed_size]);
             let mut output = vec![];
-            if let Ok(_) = decoder.read_to_end(&mut output) {
+            if decoder.read_to_end(&mut output).is_ok() {
                 let name = String::from_utf8(output);
                 let name = name.unwrap();
                 Ok((&input[compressed_size..], name))
@@ -92,8 +92,7 @@ where
             Ok((input, values))
         } else {
             let mut decoder = ZlibDecoder::new(&input[..compressed_size]);
-            let mut output = vec![];
-            output.reserve(uncompressed_size);
+            let mut output = Vec::with_capacity(uncompressed_size);
             decoder.read_to_end(&mut output).unwrap();
             // Use context error to
             let values = parse_uncompressed_string_list::<()>(&output)
