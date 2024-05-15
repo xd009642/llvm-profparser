@@ -5,6 +5,7 @@ use crate::util::*;
 use anyhow::{bail, Result};
 use nom::error::Error as NomError;
 use object::{Endian, Endianness, Object, ObjectSection, Section};
+use std::collections::HashSet;
 use std::convert::TryInto;
 use std::error::Error;
 use std::fmt;
@@ -149,14 +150,14 @@ impl<'a> CoverageMapping<'a> {
         result
     }
 
-    pub fn generate_report(&self) -> CoverageReport {
+    pub fn generate_subreport(&self, covered_files: Option<HashSet<&Path>>) -> CoverageReport {
         let mut report = CoverageReport::default();
         //let base_region_ids = info.get_simple_counters(self.profile);
         for info in &self.mapping_info {
             for func in &info.cov_fun {
                 let base_region_ids = self.get_simple_counters(func);
                 let paths = info.get_files_from_id(func.header.filenames_ref);
-                if paths.is_empty() {
+                if paths.is_empty() || !covered_files.as_ref().map(|covered| paths.iter().any(|file| covered.contains(file.as_path()))).unwrap_or(true) {
                     continue;
                 }
 
@@ -264,6 +265,10 @@ impl<'a> CoverageMapping<'a> {
             }
         }
         report
+    }
+
+    pub fn generate_report(&self) -> CoverageReport {
+        self.generate_subreport(None)
     }
 }
 
