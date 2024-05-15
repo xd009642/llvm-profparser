@@ -10,7 +10,7 @@ use std::convert::TryInto;
 use std::error::Error;
 use std::fmt;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use tracing::{debug, error, trace, warn};
 
 /// Stores the instrumentation profile and information from the coverage mapping sections in the
@@ -150,7 +150,7 @@ impl<'a> CoverageMapping<'a> {
         result
     }
 
-    pub fn generate_subreport(&self, covered_files: Option<HashSet<&Path>>) -> CoverageReport {
+    pub fn generate_subreport(&self, covered_files: Option<HashSet<PathBuf>>) -> CoverageReport {
         let mut report = CoverageReport::default();
         //let base_region_ids = info.get_simple_counters(self.profile);
         for info in &self.mapping_info {
