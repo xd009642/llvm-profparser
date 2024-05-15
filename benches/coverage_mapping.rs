@@ -40,7 +40,6 @@ pub fn report_generation(c: &mut Criterion) {
 
     let mapping = CoverageMapping::new(&binaries, &profile, true).unwrap();
 
-
     c.bench_function("report generation", |b| {
         b.iter(|| {
             let _a = mapping.generate_report();

@@ -157,7 +157,12 @@ impl<'a> CoverageMapping<'a> {
             for func in &info.cov_fun {
                 let base_region_ids = self.get_simple_counters(func);
                 let paths = info.get_files_from_id(func.header.filenames_ref);
-                if paths.is_empty() || !covered_files.as_ref().map(|covered| paths.iter().any(|file| covered.contains(file.as_path()))).unwrap_or(true) {
+                if paths.is_empty()
+                    || !covered_files
+                        .as_ref()
+                        .map(|covered| paths.iter().any(|file| covered.contains(file.as_path())))
+                        .unwrap_or(true)
+                {
                     continue;
                 }
 
