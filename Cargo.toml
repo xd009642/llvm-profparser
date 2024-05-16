@@ -62,3 +62,8 @@ path = "benches/profdata_parsing.rs"
 name =  "report_merging"
 harness = false
 path = "benches/report_merging.rs"
+
+[[bench]]
+name = "coverage_mapping"
+harness = false
+path = "benches/coverage_mapping.rs"

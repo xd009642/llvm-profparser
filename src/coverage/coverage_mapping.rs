@@ -9,7 +9,7 @@ use std::convert::TryInto;
 use std::error::Error;
 use std::fmt;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use tracing::{debug, error, trace, warn};
 
 /// Stores the instrumentation profile and information from the coverage mapping sections in the
@@ -149,14 +149,17 @@ impl<'a> CoverageMapping<'a> {
         result
     }
 
-    pub fn generate_report(&self) -> CoverageReport {
+    pub fn generate_subreport<P>(&self, mut predicate: P) -> CoverageReport
+    where
+        P: FnMut(&[PathBuf]) -> bool,
+    {
         let mut report = CoverageReport::default();
         //let base_region_ids = info.get_simple_counters(self.profile);
         for info in &self.mapping_info {
             for func in &info.cov_fun {
                 let base_region_ids = self.get_simple_counters(func);
                 let paths = info.get_files_from_id(func.header.filenames_ref);
-                if paths.is_empty() {
+                if paths.is_empty() || !predicate(&paths) {
                     continue;
                 }
 
@@ -264,6 +267,10 @@ impl<'a> CoverageMapping<'a> {
             }
         }
         report
+    }
+
+    pub fn generate_report(&self) -> CoverageReport {
+        self.generate_subreport(|_| true)
     }
 }
 
