@@ -47,6 +47,37 @@ pub fn report_generation(c: &mut Criterion) {
     });
 }
 
-criterion_group!(benches, coverage_mapping, report_generation);
+pub fn subreport_generation(c: &mut Criterion) {
+    let files = fs::read_dir("./benches/data/mapping/profraws")
+        .unwrap()
+        .map(|x| x.unwrap().path())
+        .collect::<Vec<_>>();
+
+    let profile = merge_profiles(&files).unwrap();
+
+    let binaries = fs::read_dir("./benches/data/mapping/binaries")
+        .unwrap()
+        .map(|x| x.unwrap().path())
+        .collect::<Vec<_>>();
+
+    let mapping = CoverageMapping::new(&binaries, &profile, true).unwrap();
+
+    c.bench_function("subreport generation", |b| {
+        b.iter(|| {
+            let _a = mapping.generate_subreport(|paths| {
+                paths
+                    .iter()
+                    .any(|path| path.starts_with("/home/daniel/personal/tarpaulin/src"))
+            });
+        })
+    });
+}
+
+criterion_group!(
+    benches,
+    coverage_mapping,
+    report_generation,
+    subreport_generation
+);
 
 criterion_main!(benches);
