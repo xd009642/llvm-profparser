@@ -1,6 +1,6 @@
 [package]
 name = "llvm_profparser"
-version = "0.5.0"
+version = "0.6.0"
 authors = ["xd009642 <danielmckenna93@gmail.com>"]
 description = "Parsing and interpretation of llvm coverage profiles and generated data"
 repository = "https://github.com/xd009642/llvm-profparser"
