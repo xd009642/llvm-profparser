@@ -67,3 +67,6 @@ path = "benches/report_merging.rs"
 name = "coverage_mapping"
 harness = false
 path = "benches/coverage_mapping.rs"
+
+[lints.rust]
+unexpected_cfgs = { level = "allow"  }

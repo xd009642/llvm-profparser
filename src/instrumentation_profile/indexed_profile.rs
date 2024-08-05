@@ -37,6 +37,7 @@ pub struct Header {
     pub hash_offset: u64,
     pub mem_prof_offset: Option<u64>,
     pub binary_id_offset: Option<u64>,
+    pub vtable_offset: Option<u64>,
     pub temporary_prof_traces_offset: Option<u64>,
 }
 
@@ -235,6 +236,14 @@ impl InstrProfReader for IndexedInstrProf {
             } else {
                 (bytes, None)
             };
+
+            let (bytes, vtable_offset) = if version >= 12 {
+                let (bytes, offset) = le_u64(bytes)?;
+                (bytes, Some(offset))
+            } else {
+                (bytes, None)
+            };
+
             let (bytes, temporary_prof_traces_offset) = if version >= 10 {
                 let (bytes, offset) = le_u64(bytes)?;
                 (bytes, Some(offset))
@@ -249,6 +258,7 @@ impl InstrProfReader for IndexedInstrProf {
                     hash_offset,
                     mem_prof_offset,
                     binary_id_offset,
+                    vtable_offset,
                     temporary_prof_traces_offset,
                 },
             ))
