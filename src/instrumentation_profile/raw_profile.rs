@@ -68,6 +68,8 @@ pub struct Header {
     pub num_bitmap_bytes: u64,
     pub padding_bytes_after_bitmap_bytes: u64,
     pub bitmap_delta: u64,
+    pub num_vtables: u64,
+    pub vnames_size: u64,
 }
 
 impl Header {
@@ -450,6 +452,15 @@ where
             };
 
             let (bytes, names_delta) = nom_u64(endianness)(bytes)?;
+
+            let (bytes, num_vtables, vnames_size) = if (version & !VARIANT_MASKS_ALL) >= 10 {
+                let (bytes, num_vtables) = nom_u64(endianness)(bytes)?;
+                let (bytes, vnames_len) = nom_u64(endianness)(bytes)?;
+                (bytes, num_vtables, vnames_len)
+            } else {
+                (bytes, 0, 0)
+            };
+
             let (bytes, value_kind_last) = nom_u64(endianness)(bytes)?;
 
             let result = Header {
@@ -467,6 +478,8 @@ where
                 num_bitmap_bytes,
                 padding_bytes_after_bitmap_bytes,
                 bitmap_delta,
+                num_vtables,
+                vnames_size,
             };
             debug!("Read header {:?}", result);
             Ok((bytes, result))
