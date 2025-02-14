@@ -129,7 +129,6 @@ impl HashTable {
         _offset: usize,
         bucket_start: usize,
     ) -> ParseResult<'a, Self> {
-        assert!(bucket_start > 0);
         let (bytes, num_buckets) = le_u64(&input[bucket_start..])?;
         debug!("Number of hashtable buckets: {}", num_buckets);
         let (_bytes, mut num_entries) = le_u64(bytes)?;

@@ -1,6 +1,6 @@
 [package]
 name = "llvm_profparser"
-version = "0.7.0"
+version = "0.7.1"
 authors = ["xd009642 <danielmckenna93@gmail.com>"]
 description = "Parsing and interpretation of llvm coverage profiles and generated data"
 repository = "https://github.com/xd009642/llvm-profparser"
@@ -11,6 +11,7 @@ categories = ["encoding"]
 keywords = ["coverage", "llvm"]
 exclude = ["tests/*", ".github/*", "benches/*"]
 build = "build.rs"
+rust-version = "1.80.0"
 
 [features]
 default = ["cli"]

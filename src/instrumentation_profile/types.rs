@@ -245,7 +245,7 @@ impl InstrumentationProfile {
 
     /// Returns true if there are no instrumentation records associated with the profile
     pub fn is_empty(&self) -> bool {
-        self.records.is_empty()
+        self.records.is_empty() && self.symtab.is_empty()
     }
 }
 
