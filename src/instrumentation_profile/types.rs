@@ -1,7 +1,6 @@
 use nom::number::Endianness;
 use rustc_hash::FxHashMap;
 use std::cmp::Ordering;
-use std::collections::BTreeMap;
 use std::convert::TryInto;
 use std::fmt;
 

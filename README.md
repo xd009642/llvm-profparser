@@ -16,7 +16,7 @@ a parser for some of their file formats to aid interoperability in Rust.
 ## Contributing
 
 All of the functionality required has been implemented, however there are areas
-to improve in handling unexpected or invalid files. To start fining issues
+to improve in handling unexpected or invalid files. To start finding issues
 there's a fuzz directory which will undoubtedly reveal some issues that can be
 fixed. Go into the fuzz directory for guides on how to run. 
 
