@@ -53,7 +53,7 @@ fn data_root_dir() -> PathBuf {
 }
 
 fn get_data_dir() -> PathBuf {
-    let rustc = env::var("RUSTC").unwrap();
+    let rustc = std::env::var("RUSTC").unwrap();
     let output = Command::new(rustc).arg("-vV").output().unwrap();
     let version_info = String::from_utf8_lossy(&output.stdout);
     println!("Version info: {}", version_info);
