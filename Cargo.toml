@@ -71,3 +71,6 @@ path = "benches/coverage_mapping.rs"
 
 [lints.rust]
 unexpected_cfgs = { level = "allow"  }
+
+[profile.bench]
+debug = true

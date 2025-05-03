@@ -30,9 +30,9 @@ impl ValueKind {
     }
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Eq, Ord, PartialOrd, Hash)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Symtab {
-    pub names: BTreeMap<u64, String>,
+    pub names: FxHashMap<u64, String>,
 }
 
 pub fn compute_hash(data: impl AsRef<[u8]>) -> u64 {
