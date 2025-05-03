@@ -53,6 +53,10 @@ fn data_root_dir() -> PathBuf {
 }
 
 fn get_data_dir() -> PathBuf {
+    let rustc = env::var("RUSTC").unwrap();
+    let output = Command::new(rustc).arg("-vV").output().unwrap();
+    let version_info = String::from_utf8_lossy(&output.stdout);
+    println!("Version info: {}", version_info);
     cfg_if::cfg_if! {
         if #[cfg(llvm_11)] {
             PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests").join("data").join("profdata").join("llvm-11")
@@ -75,10 +79,6 @@ fn get_data_dir() -> PathBuf {
         } else if #[cfg(llvm_20)] {
             PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests").join("data").join("profdata").join("llvm-20")
         } else {
-            let rustc = env::var("RUSTC").unwrap();
-            let output = Command::new(rustc).arg("-vV").output().unwrap();
-            let version_info = String::from_utf8_lossy(&output.stdout);
-            println!("Version info: {}", version_info);
             data_root_dir()
         }
     }
