@@ -72,6 +72,8 @@ fn get_data_dir() -> PathBuf {
             PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests").join("data").join("profdata").join("llvm-18")
         } else if #[cfg(llvm_19)] {
             PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests").join("data").join("profdata").join("llvm-19")
+        } else if #[cfg(llvm_20)] {
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests").join("data").join("profdata").join("llvm-20")
         } else {
             data_root_dir()
         }

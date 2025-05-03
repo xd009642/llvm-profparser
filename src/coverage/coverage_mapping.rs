@@ -218,25 +218,31 @@ impl<'a> CoverageMapping<'a> {
                             if rhs_none && expr.rhs.is_instrumentation() {
                                 region_ids.insert(expr.rhs, 0);
                             }
-                            pending_exprs.push((expr_index, expr));
+                            pending_exprs.push(Some((expr_index, expr)));
                             continue;
                         }
                     }
                 }
                 let mut index = 0;
+                let mut cleared_expressions = 0;
                 let mut tries_left = pending_exprs.len() + 1;
-                while !pending_exprs.is_empty() {
+                while pending_exprs.len() != cleared_expressions {
                     assert!(tries_left > 0);
                     if index >= pending_exprs.len() {
                         index = 0;
                         tries_left -= 1;
                     }
-                    let (expr_index, expr) = pending_exprs[index];
+                    let (expr_index, expr) = match pending_exprs[index].as_ref() {
+                        Some((idx, expr)) => (idx, expr),
+                        None => {
+                            index += 1;
+                            continue;
+                        }
+                    };
                     let lhs = region_ids.get(&expr.lhs);
                     let rhs = region_ids.get(&expr.rhs);
                     match (lhs, rhs) {
                         (Some(lhs), Some(rhs)) => {
-                            pending_exprs.remove(index);
                             let count = match expr.kind {
                                 ExprKind::Subtract => lhs - rhs,
                                 ExprKind::Add => lhs + rhs,
@@ -244,12 +250,12 @@ impl<'a> CoverageMapping<'a> {
 
                             let counter = Counter {
                                 kind: CounterType::Expression(expr.kind),
-                                id: expr_index as _,
+                                id: *expr_index as _,
                             };
 
                             region_ids.insert(counter, count);
                             if let Some(expr_region) = func.regions.iter().find(|x| {
-                                x.count.is_expression() && x.count.id == expr_index as u64
+                                x.count.is_expression() && x.count.id == *expr_index as u64
                             }) {
                                 let result = report
                                     .files
@@ -257,6 +263,8 @@ impl<'a> CoverageMapping<'a> {
                                     .or_default();
                                 result.insert(expr_region.loc.clone(), count as _);
                             }
+                            pending_exprs[index] = None;
+                            cleared_expressions += 1;
                         }
                         _ => {
                             index += 1;
