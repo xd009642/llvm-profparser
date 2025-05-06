@@ -167,6 +167,11 @@ impl InstrumentationProfile {
         self.record_name_lookup.get(name).map(|x| &self.records[*x])
     }
 
+    pub fn find_record_by_hash(&self, hash: u64) -> Option<&NamedInstrProfRecord> {
+        let name = self.symtab.get(hash)?;
+        self.find_record_by_name(name)
+    }
+
     pub fn find_record_by_name_mut(&mut self, name: &str) -> Option<&mut NamedInstrProfRecord> {
         if let Some(index) = self.record_name_lookup.get(name) {
             Some(&mut self.records[*index])
