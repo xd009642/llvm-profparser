@@ -390,7 +390,7 @@ where
                     Self::read_value_profiling_data(&header, data, input, &mut record)?;
                 input = bytes;
                 let name = symtab.names.get(&data.name_ref).cloned();
-                let (hash, name_hash) = if symtab.contains(data.name_ref) {
+                let (hash, name_hash) = if name.is_some() {
                     // Previously this function calculated the function hash itself to be
                     // ultra-defensive against the profraw format changing hash calculation method
                     // so we try not to rely on reimplementing it. However, md5::compute was more

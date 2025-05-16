@@ -67,6 +67,10 @@ impl Symtab {
         self.names.insert(hash, name);
     }
 
+    pub fn add_func_name_with_hash(&mut self, name: String, hash: u64) {
+        self.names.insert(hash, name);
+    }
+
     pub fn contains(&self, hash: u64) -> bool {
         self.names.contains_key(&hash)
     }
