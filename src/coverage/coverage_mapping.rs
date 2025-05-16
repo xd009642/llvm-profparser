@@ -140,6 +140,7 @@ impl<'a> CoverageMapping<'a> {
         result.insert(Counter::default(), 0);
         let record = self.profile.find_record_by_hash(func.header.name_hash);
         if let Some(func_record) = record.as_ref() {
+            result.reserve(func_record.record.counts.len());
             for (id, count) in func_record.record.counts.iter().enumerate() {
                 result.insert(Counter::instrumentation(id as u64), *count as i64);
             }
