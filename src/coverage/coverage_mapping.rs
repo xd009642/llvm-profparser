@@ -175,7 +175,7 @@ impl<'a> CoverageMapping<'a> {
 
                 let mut pending_exprs = vec![];
 
-                for (expr_index, expr) in func.expressions.iter().enumerate() {
+                for (expr_index, expr) in func.expressions.iter().enumerate().rev() {
                     let lhs = region_ids.get(&expr.lhs);
                     let rhs = region_ids.get(&expr.rhs);
                     match (lhs, rhs) {
