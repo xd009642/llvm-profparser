@@ -4,12 +4,12 @@ use crate::instrumentation_profile::types::*;
 use crate::util::*;
 use anyhow::{bail, Result};
 use nom::error::Error as NomError;
-use object::{Endian, Endianness, Object, ObjectSection, Section, ReadCache, ReadRef};
+use object::{Endian, Endianness, Object, ObjectSection, ReadCache, ReadRef, Section};
 use std::convert::TryInto;
 use std::error::Error;
-use std::io::BufReader;
 use std::fmt;
 use std::fs;
+use std::io::BufReader;
 use std::path::{Path, PathBuf};
 use tracing::{debug, error, trace, warn};
 
