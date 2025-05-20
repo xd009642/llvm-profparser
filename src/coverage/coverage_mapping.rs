@@ -4,7 +4,7 @@ use crate::instrumentation_profile::types::*;
 use crate::util::*;
 use anyhow::{bail, Result};
 use nom::error::Error as NomError;
-use object::{Endian, Endianness, Object, ObjectSection, Section};
+use object::{Endian, Endianness, Object, ObjectSection, Section, ReadCache, ReadRef};
 use std::convert::TryInto;
 use std::error::Error;
 use std::fmt;
@@ -61,8 +61,22 @@ impl Error for SectionReadError {}
 pub fn read_object_file(object: &Path, version: u64) -> Result<CoverageMappingInfo> {
     // I believe vnode sections added by llvm are unnecessary
 
-    let binary_data = fs::read(object)?;
-    let object_file = object::File::parse(&*binary_data)?;
+    let binary_data = ReadCache::new(fs::File::open(object)?);
+    let object_file = object::File::parse(&binary_data)?;
+
+    let prof_counts = object_file
+        .section_by_name("__llvm_prf_cnts")
+        .or(object_file.section_by_name(".lprfc"))
+        .and_then(|x| parse_profile_counters(object_file.endianness(), &x).ok());
+
+    debug!("Parsed prf_cnts: {:?}", prof_counts);
+
+    let prof_data = object_file
+        .section_by_name("__llvm_prf_data")
+        .or(object_file.section_by_name(".lprfd"))
+        .and_then(|x| parse_profile_data(object_file.endianness(), &x).ok());
+
+    debug!("Parsed prf_data section: {:?}", prof_data);
 
     let cov_fun = object_file
         .section_by_name("__llvm_covfun")
@@ -81,20 +95,6 @@ pub fn read_object_file(object: &Path, version: u64) -> Result<CoverageMappingIn
         .ok_or(SectionReadError::MissingSection(LlvmSection::CoverageMap))??;
 
     debug!("Parsed covmap section: {:?}", cov_map);
-
-    let prof_counts = object_file
-        .section_by_name("__llvm_prf_cnts")
-        .or(object_file.section_by_name(".lprfc"))
-        .and_then(|x| parse_profile_counters(object_file.endianness(), &x).ok());
-
-    debug!("Parsed prf_cnts: {:?}", prof_counts);
-
-    let prof_data = object_file
-        .section_by_name("__llvm_prf_data")
-        .or(object_file.section_by_name(".lprfd"))
-        .and_then(|x| parse_profile_data(object_file.endianness(), &x).ok());
-
-    debug!("Parsed prf_data section: {:?}", prof_data);
 
     Ok(CoverageMappingInfo {
         cov_map,
@@ -281,9 +281,9 @@ impl<'a> CoverageMapping<'a> {
     }
 }
 
-fn parse_coverage_mapping(
+fn parse_coverage_mapping<'data, R: ReadRef<'data>>(
     endian: Endianness,
-    section: &Section<'_, '_>,
+    section: &Section<'data, '_, R>,
     version: u64,
 ) -> Result<FxHashMap<u64, Vec<PathBuf>>, SectionReadError> {
     if let Ok(mut data) = section.data() {
@@ -323,9 +323,9 @@ fn parse_coverage_mapping(
     }
 }
 
-fn parse_coverage_functions(
+fn parse_coverage_functions<'data, R: ReadRef<'data>>(
     endian: Endianness,
-    section: &Section<'_, '_>,
+    section: &Section<'data, '_, R>,
 ) -> Result<Vec<FunctionRecordV3>, SectionReadError> {
     debug!("Parsing coverage functions");
     if let Ok(original_data) = section.data() {
@@ -486,9 +486,9 @@ fn parse_mapping_regions<'a>(
     Ok((bytes, mapping))
 }
 
-fn parse_profile_data(
+fn parse_profile_data<'data, R: ReadRef<'data>>(
     endian: Endianness,
-    section: &Section<'_, '_>,
+    section: &Section<'data, '_, R>,
 ) -> Result<Vec<ProfileData>, SectionReadError> {
     if let Ok(data) = section.data() {
         let mut bytes = data;
@@ -529,9 +529,9 @@ fn parse_profile_data(
     }
 }
 
-fn parse_profile_counters(
+fn parse_profile_counters<'data, R: ReadRef<'data>>(
     endian: Endianness,
-    section: &Section<'_, '_>,
+    section: &Section<'data, '_, R>,
 ) -> Result<Vec<u64>, SectionReadError> {
     if let Ok(data) = section.data() {
         let mut result = vec![];
