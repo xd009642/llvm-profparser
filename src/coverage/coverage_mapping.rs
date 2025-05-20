@@ -184,11 +184,13 @@ impl<'a> CoverageMapping<'a> {
                             let count: i64 = match expr.kind {
                                 ExprKind::Subtract => {
                                     trace!("Subtracting counts: {} - {}", lhs, rhs);
-                                    lhs - rhs
+                                    // TODO these saturating ops need investigation. Potentially
+                                    // something is wrong.
+                                    lhs.saturating_sub(*rhs)
                                 }
                                 ExprKind::Add => {
                                     trace!("Adding counts: {} + {}", lhs, rhs);
-                                    lhs + rhs
+                                    lhs.saturating_add(*rhs)
                                 }
                             };
 
