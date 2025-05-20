@@ -7,6 +7,7 @@ use nom::error::Error as NomError;
 use object::{Endian, Endianness, Object, ObjectSection, Section, ReadCache, ReadRef};
 use std::convert::TryInto;
 use std::error::Error;
+use std::io::BufReader;
 use std::fmt;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -61,7 +62,7 @@ impl Error for SectionReadError {}
 pub fn read_object_file(object: &Path, version: u64) -> Result<CoverageMappingInfo> {
     // I believe vnode sections added by llvm are unnecessary
 
-    let binary_data = ReadCache::new(fs::File::open(object)?);
+    let binary_data = ReadCache::new(BufReader::new(fs::File::open(object)?));
     let object_file = object::File::parse(&binary_data)?;
 
     let prof_counts = object_file

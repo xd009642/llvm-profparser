@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.8.2]
 ### Changed
 - More performance improvements this time changing search order to prefer deeper expression nodes first
+- Read object file sections without loading whole file into memory.
 
 ## [0.8.1] 2025-05-06
 ### Changed
