@@ -3,6 +3,8 @@ use rustc_hash::FxHashMap;
 use std::convert::TryFrom;
 use std::path::PathBuf;
 
+use crate::instrumentation_profile::types::MCDCParams;
+
 pub mod coverage_mapping;
 pub mod reporting;
 
@@ -79,6 +81,11 @@ pub enum RegionKind {
     /// A Branch Region represents lead-level boolean expressions and is associated with two
     /// counters, each representing the number of times the expression evaluates to true or false.
     Branch = 4,
+    /// A DecisionRegion represents a top-level boolean expression and is
+    /// associated with a variable length bitmap index and condition number.
+    MCDCDecision = 5,
+    /// A Branch Region can be extended to include IDs to facilitate MC/DC.
+    MCDCBranch = 6,
 }
 
 impl TryFrom<u64> for RegionKind {
@@ -91,6 +98,8 @@ impl TryFrom<u64> for RegionKind {
             2 => Ok(RegionKind::Skipped),
             3 => Ok(RegionKind::Gap),
             4 => Ok(RegionKind::Branch),
+            5 => Ok(RegionKind::MCDCDecision),
+            6 => Ok(RegionKind::MCDCBranch),
             e => Err(e),
         }
     }
@@ -201,6 +210,7 @@ pub struct CounterMappingRegion {
     pub file_id: usize,
     pub expanded_file_id: usize,
     pub loc: SourceLocation,
+    pub mcdc_params: Option<MCDCParams>,
 }
 
 /// Refers to a location in the source code

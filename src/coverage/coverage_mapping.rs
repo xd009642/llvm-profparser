@@ -429,6 +429,8 @@ fn parse_mapping_regions<'a>(
         bytes = data;
         let mut last_line = 0;
         for _ in 0..regions_len {
+            let mut mcdc_params = None;
+
             let mut false_count = Counter::default();
             let mut kind = RegionKind::Code;
             let (data, raw_header) = parse_leb128(bytes)?;
@@ -440,7 +442,7 @@ fn parse_mapping_regions<'a>(
                     kind = RegionKind::Expansion;
                     expanded_file_id = raw_header >> Counter::ENCODING_TAG_AND_EXP_REGION_BITS;
                     if expanded_file_id >= file_indices.len() as u64 {
-                        todo!()
+                        panic!("expanded_file_id is invalid");
                     }
                 } else {
                     let shifted_counter = raw_header >> Counter::ENCODING_TAG_AND_EXP_REGION_BITS;
@@ -454,6 +456,36 @@ fn parse_mapping_regions<'a>(
                             counter = parse_counter(c1, expressions);
                             false_count = parse_counter(c2, expressions);
                             bytes = data;
+                        }
+                        Ok(RegionKind::MCDCBranch) => {
+                            kind = RegionKind::MCDCBranch;
+                            let (data, c1) = parse_leb128(bytes)?;
+                            let (data, c2) = parse_leb128(data)?;
+
+                            counter = parse_counter(c1, expressions);
+                            false_count = parse_counter(c2, expressions);
+
+                            let (data, id1) = parse_leb128(data)?;
+                            let (data, tid1) = parse_leb128(data)?;
+                            let (data, fid1) = parse_leb128(data)?;
+                            bytes = data;
+
+                            mcdc_params = Some(MCDCParams::Branch(BranchParameters {
+                                id: id1.try_into().unwrap(),
+                                false_cond: fid1.try_into().unwrap(),
+                                true_cond: tid1.try_into().unwrap(),
+                            }));
+                        }
+                        Ok(RegionKind::MCDCDecision) => {
+                            kind = RegionKind::MCDCDecision;
+                            let (data, bidx) = parse_leb128(data)?;
+                            let (data, nc) = parse_leb128(data)?;
+                            bytes = data;
+
+                            mcdc_params = Some(MCDCParams::Decision(DecisionParameters {
+                                bitmap_idx: bidx.try_into().unwrap(),
+                                num_conditions: nc.try_into().unwrap(),
+                            }));
                         }
                         e => panic!("Malformed: {:?}", e),
                     }
@@ -489,6 +521,7 @@ fn parse_mapping_regions<'a>(
                     column_start,
                     column_end,
                 },
+                mcdc_params,
             });
         }
     }

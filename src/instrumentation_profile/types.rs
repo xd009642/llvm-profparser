@@ -419,3 +419,22 @@ impl PartialEq for InstrProfValueData {
         self.value == other.value
     }
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct BranchParameters {
+    pub id: i16,
+    pub false_cond: i16,
+    pub true_cond: i16,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct DecisionParameters {
+    pub bitmap_idx: u32,
+    pub num_conditions: u16,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum MCDCParams {
+    Branch(BranchParameters),
+    Decision(DecisionParameters),
+}
