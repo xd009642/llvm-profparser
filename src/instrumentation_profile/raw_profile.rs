@@ -292,7 +292,7 @@ where
 {
     type Header = Header;
 
-    fn parse_bytes(mut input: &[u8]) -> ParseResult<InstrumentationProfile> {
+    fn parse_bytes(mut input: &[u8]) -> ParseResult<'_, InstrumentationProfile> {
         if !input.is_empty() {
             let mut result = InstrumentationProfile::default();
             let (bytes, header) = Self::parse_header(input)?;
@@ -417,7 +417,7 @@ where
         }
     }
 
-    fn parse_header(input: &[u8]) -> ParseResult<Self::Header> {
+    fn parse_header(input: &[u8]) -> ParseResult<'_, Self::Header> {
         if Self::has_format(input) {
             let endianness = file_endianness::<T>(&input[..8].try_into().unwrap());
             let (bytes, version) = nom_u64(endianness)(&input[8..])?;

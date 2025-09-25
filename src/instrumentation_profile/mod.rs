@@ -52,9 +52,9 @@ pub fn parse_bytes(data: &[u8]) -> io::Result<InstrumentationProfile> {
 pub trait InstrProfReader {
     type Header;
     /// Parse the profile no lazy parsing here!
-    fn parse_bytes(input: &[u8]) -> ParseResult<InstrumentationProfile>;
+    fn parse_bytes(input: &[u8]) -> ParseResult<'_, InstrumentationProfile>;
     /// Parses a header
-    fn parse_header(input: &[u8]) -> ParseResult<Self::Header>;
+    fn parse_header(input: &[u8]) -> ParseResult<'_, Self::Header>;
     /// Detects that the bytes match the current reader format if it can't read the format it will
     /// return false
     fn has_format(input: impl Read) -> bool;

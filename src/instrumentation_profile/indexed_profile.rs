@@ -164,7 +164,7 @@ fn parse_summary<'a>(
 impl InstrProfReader for IndexedInstrProf {
     type Header = Header;
 
-    fn parse_bytes(mut input: &[u8]) -> ParseResult<InstrumentationProfile> {
+    fn parse_bytes(mut input: &[u8]) -> ParseResult<'_, InstrumentationProfile> {
         let (bytes, header) = Self::parse_header(input)?;
         debug!("Parsed header: {:?}", header);
         let (bytes, summary) = parse_summary(bytes, &header, false)?;
@@ -210,7 +210,7 @@ impl InstrProfReader for IndexedInstrProf {
         Ok((input, profile))
     }
 
-    fn parse_header(input: &[u8]) -> ParseResult<Self::Header> {
+    fn parse_header(input: &[u8]) -> ParseResult<'_, Self::Header> {
         if Self::has_format(input) {
             let (bytes, version) = le_u64(&input[8..])?;
             let (bytes, _) = le_u64(bytes)?;

@@ -16,14 +16,14 @@ struct KeyDataLen {
 #[derive(Clone, Debug)]
 pub(crate) struct HashTable(pub IndexMap<(u64, String), InstrProfRecord>);
 
-fn read_key_data_len(input: &[u8]) -> ParseResult<KeyDataLen> {
+fn read_key_data_len(input: &[u8]) -> ParseResult<'_, KeyDataLen> {
     let (bytes, key_len) = le_u64(input)?;
     let (bytes, data_len) = le_u64(bytes)?;
     let res = KeyDataLen { key_len, data_len };
     Ok((bytes, res))
 }
 
-fn read_key(input: &[u8], key_len: usize) -> ParseResult<Cow<'_, str>> {
+fn read_key(input: &[u8], key_len: usize) -> ParseResult<'_, Cow<'_, str>> {
     if key_len > input.len() {
         Err(nom::Err::Failure(VerboseError::from_error_kind(
             &input[input.len()..],
@@ -39,7 +39,7 @@ fn read_value(
     version: u64,
     mut input: &[u8],
     data_len: usize,
-) -> ParseResult<(u64, InstrProfRecord)> {
+) -> ParseResult<'_, (u64, InstrProfRecord)> {
     if data_len % 8 != 0 {
         // Element is corrupted, it should be aligned
         let errors = vec![(

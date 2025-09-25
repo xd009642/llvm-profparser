@@ -47,7 +47,7 @@ fn str_to_digit(bytes: &[u8]) -> u64 {
         .unwrap_or_default()
 }
 
-fn read_hexadecimal(input: &[u8]) -> ParseResult<u64> {
+fn read_hexadecimal(input: &[u8]) -> ParseResult<'_, u64> {
     preceded(alt((tag(b"0x"), tag(b"0X"))), take_while1(is_hex_digit))(input).map(|(b, v)| unsafe {
         // We know this is okay because it's just the bytes that pass `is_hex_digit`
         (
@@ -63,11 +63,11 @@ fn valid_name_char(character: u8) -> bool {
     c.is_ascii() && c != '\n' && c != '\r'
 }
 
-fn strip_whitespace(s: &[u8]) -> ParseResult<()> {
+fn strip_whitespace(s: &[u8]) -> ParseResult<'_, ()> {
     one_of(&b" \n\r\t"[..])(s).map(|(b, _)| (b, ()))
 }
 
-fn strip_comments(s: &[u8]) -> ParseResult<()> {
+fn strip_comments(s: &[u8]) -> ParseResult<'_, ()> {
     delimited(
         tag(b"#"),
         alt((take_until("\r"), take_until("\n"))),
@@ -76,11 +76,11 @@ fn strip_comments(s: &[u8]) -> ParseResult<()> {
     .map(|(b, _)| (b, ()))
 }
 
-fn skip_to_content(s: &[u8]) -> ParseResult<()> {
+fn skip_to_content(s: &[u8]) -> ParseResult<'_, ()> {
     many0(alt((strip_whitespace, strip_comments)))(s).map(|(b, _)| (b, ()))
 }
 
-fn match_header_tags(s: &[u8]) -> ParseResult<&[u8]> {
+fn match_header_tags(s: &[u8]) -> ParseResult<'_, &[u8]> {
     alt((
         tag_no_case(IR_TAG),
         tag_no_case(FE_TAG),
@@ -91,33 +91,33 @@ fn match_header_tags(s: &[u8]) -> ParseResult<&[u8]> {
     ))(s)
 }
 
-fn parse_header_tags(s: &[u8]) -> ParseResult<Vec<&[u8]>> {
+fn parse_header_tags(s: &[u8]) -> ParseResult<'_, Vec<&[u8]>> {
     many0(delimited(tag(b":"), match_header_tags, line_ending))(s)
 }
 
-fn read_line(s: &[u8]) -> ParseResult<&[u8]> {
+fn read_line(s: &[u8]) -> ParseResult<'_, &[u8]> {
     tuple((take_while1(valid_name_char), line_ending))(s).map(|(b, (v, _))| (b, v))
 }
 
-fn read_decimal(s: &[u8]) -> ParseResult<u64> {
+fn read_decimal(s: &[u8]) -> ParseResult<'_, u64> {
     tuple((take_while1(is_digit), alt((line_ending, eof))))(s).map(|(b, v)| (b, str_to_digit(v.0)))
 }
 
-fn read_digit(s: &[u8]) -> ParseResult<u64> {
+fn read_digit(s: &[u8]) -> ParseResult<'_, u64> {
     alt((read_decimal, read_hexadecimal))(s)
 }
 
-fn indirect_value_site(s: &[u8]) -> ParseResult<(&[u8], u64)> {
+fn indirect_value_site(s: &[u8]) -> ParseResult<'_, (&[u8], u64)> {
     tuple((take_until(":"), tag(":"), take_while1(is_digit)))(s)
         .map(|(b, v)| (b, (v.0, str_to_digit(v.2))))
 }
 
-fn memop_value_site(s: &[u8]) -> ParseResult<(u64, u64)> {
+fn memop_value_site(s: &[u8]) -> ParseResult<'_, (u64, u64)> {
     tuple((take_while1(is_digit), tag(":"), take_while1(is_digit)))(s)
         .map(|(b, v)| (b, (str_to_digit(v.0), str_to_digit(v.2))))
 }
 
-fn read_value_profile_data(mut input: &[u8]) -> ParseResult<Option<Box<ValueProfDataRecord>>> {
+fn read_value_profile_data(mut input: &[u8]) -> ParseResult<'_, Option<Box<ValueProfDataRecord>>> {
     if let Ok((bytes, n_kinds)) = read_digit(input) {
         let mut record = Box::<ValueProfDataRecord>::default();
         // We have value profiling data!
@@ -190,7 +190,7 @@ fn read_value_profile_data(mut input: &[u8]) -> ParseResult<Option<Box<ValueProf
 
 impl InstrProfReader for TextInstrProf {
     type Header = Header;
-    fn parse_bytes(mut input: &[u8]) -> ParseResult<InstrumentationProfile> {
+    fn parse_bytes(mut input: &[u8]) -> ParseResult<'_, InstrumentationProfile> {
         let (bytes, header) = Self::parse_header(input)?;
         let (bytes, _) = skip_to_content(bytes)?;
         input = bytes;
@@ -252,7 +252,7 @@ impl InstrProfReader for TextInstrProf {
         Ok((bytes, result))
     }
 
-    fn parse_header(input: &[u8]) -> ParseResult<Self::Header> {
+    fn parse_header(input: &[u8]) -> ParseResult<'_, Self::Header> {
         let (input, _) = skip_to_content(input)?;
         let (bytes, names) = parse_header_tags(input)?;
         let mut is_ir_level = false;
