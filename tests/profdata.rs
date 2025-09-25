@@ -5,6 +5,7 @@ use std::ffi::OsStr;
 use std::fs::read_dir;
 use std::path::PathBuf;
 use std::process::Command;
+use std::sync::LazyLock;
 
 /*
 Counters:
@@ -126,7 +127,28 @@ fn check_merge_command(files: &[PathBuf], id: &str) {
     }
 }
 
+// Check that we have the exes we need to run these test at all.
+// Otherwise, we give very poor error messages running the same commands in a loop over and over.
+static ASSERT_CMDS_EXIST: LazyLock<()> = LazyLock::new(|| {
+    assert_cmd::Command::new("cargo")
+        .args(&["profdata", "--version"])
+        .assert()
+        .append_context(
+            "help",
+            "run 'cargo install cargo-binutils && rustup component add llvm-tools-preview'",
+        )
+        .success();
+    // this is the version of llvm-profdata itself
+    assert_cmd::Command::new("cargo")
+        .args(&["profdata", "--", "--version"])
+        .assert()
+        .append_context("help", "run 'rustup component add llvm-tools-preview'")
+        .success();
+});
+
 fn check_command(ext: &OsStr) {
+    LazyLock::force(&ASSERT_CMDS_EXIST);
+
     // TODO we should consider doing different permutations of args. Some things which rely on
     // the ordering of elements in a priority_queue etc will display differently though...
     let data = get_data_dir();
@@ -145,7 +167,7 @@ fn check_command(ext: &OsStr) {
             .args(&["profdata", "--", "show", "--all-functions", "--counts"])
             .arg(raw_file.file_name())
             .output()
-            .expect("cargo binutils or llvm-profdata is not installed");
+            .expect("cargo not installed???");
 
         let llvm_struct: Output = serde_yaml::from_slice(&llvm.stdout).unwrap();
 
@@ -177,6 +199,8 @@ fn check_command(ext: &OsStr) {
 }
 
 fn check_against_text(ext: &OsStr) {
+    LazyLock::force(&ASSERT_CMDS_EXIST);
+
     let data = get_data_dir();
     let mut count = 0;
     for raw_file in read_dir(&data)
@@ -197,7 +221,7 @@ fn check_against_text(ext: &OsStr) {
             ])
             .arg(raw_file.file_name())
             .output()
-            .expect("cargo binutils or llvm-profdata is not installed");
+            .expect("failed to spawn cargo?");
 
         if llvm.status.success() {
             count += 1;
@@ -224,7 +248,11 @@ fn check_against_text(ext: &OsStr) {
             let parse_records = parsed_prof.records().iter().collect::<HashSet<_>>();
             assert_eq!(text_records, parse_records);
         } else {
-            println!("{} failed", raw_file.path().display());
+            println!(
+                "{} failed: {}",
+                raw_file.path().display(),
+                String::from_utf8_lossy(&llvm.stderr),
+            );
         }
     }
     if count == 0 {
