@@ -32,7 +32,7 @@ jobs:
           cargo check --all-features
       - name: test
         run: |
-          cargo install cargo-binutils
+          cargo install cargo-binutils@0.3.6
           cargo test 
       - name: check formatting
         run: cargo fmt -- --check
