@@ -223,28 +223,29 @@ impl InstrProfReader for IndexedInstrProf {
                     error,
                 ))
             })?;
+            let version_num = version & !VARIANT_MASKS_ALL;
             let (bytes, hash_offset) = le_u64(bytes)?;
-            let (bytes, mem_prof_offset) = if version >= 8 {
+            let (bytes, mem_prof_offset) = if version_num >= 8 {
                 let (bytes, offset) = le_u64(bytes)?;
                 (bytes, Some(offset))
             } else {
                 (bytes, None)
             };
-            let (bytes, binary_id_offset) = if version >= 9 {
-                let (bytes, offset) = le_u64(bytes)?;
-                (bytes, Some(offset))
-            } else {
-                (bytes, None)
-            };
-
-            let (bytes, vtable_offset) = if version >= 12 {
+            let (bytes, binary_id_offset) = if version_num >= 9 {
                 let (bytes, offset) = le_u64(bytes)?;
                 (bytes, Some(offset))
             } else {
                 (bytes, None)
             };
 
-            let (bytes, temporary_prof_traces_offset) = if version >= 10 {
+            let (bytes, vtable_offset) = if version_num >= 12 {
+                let (bytes, offset) = le_u64(bytes)?;
+                (bytes, Some(offset))
+            } else {
+                (bytes, None)
+            };
+
+            let (bytes, temporary_prof_traces_offset) = if version_num >= 10 {
                 let (bytes, offset) = le_u64(bytes)?;
                 (bytes, Some(offset))
             } else {
