@@ -10,12 +10,27 @@ license = "Apache-2.0"
 categories = ["encoding"]
 keywords = ["coverage", "llvm"]
 exclude = ["tests/*", ".github/*", "benches/*"]
-build = "build.rs"
 rust-version = "1.80.0"
 
 [features]
-default = ["cli"]
+default = ["cli", "__llvm_20"]
 cli = ["structopt", "tracing-subscriber"]
+
+# for testing
+# to run all tests, run `cargo test --all-features`.
+# to run a specific version, run `cargo test --no-default-features --featurs __llvm_XX`.
+# by default, only runs tests again llvm 20
+__llvm_11 = []
+__llvm_12 = []
+__llvm_13 = []
+__llvm_14 = []
+__llvm_15 = []
+__llvm_16 = []
+__llvm_17 = []
+__llvm_18 = []
+__llvm_19 = []
+__llvm_20 = []
+__llvm_21 = []
 
 [dependencies]
 anyhow = "1.0.65"

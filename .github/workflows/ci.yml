@@ -10,11 +10,6 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        version:
-          - 1.82.0
-          - stable
-          - beta
-          - nightly 
         target:
           - x86_64-unknown-linux-gnu
           - x86_64-unknown-linux-musl
@@ -23,7 +18,7 @@ jobs:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
         with:
-          toolchain: ${{ matrix.version }}
+          toolchain: "1.90"
           override: true
           components: rustfmt, llvm-tools-preview
       - name: build
@@ -32,17 +27,15 @@ jobs:
           cargo check --all-features
       - name: test
         run: |
-          cargo install cargo-binutils@0.3.6
-          cargo test 
+          # TODO: switch this to a published version after the next release
+          cargo install --git https://github.com/rust-embedded/cargo-binutils/ --rev 7fc23414305df173dc46a5fa4b98ab2bcd3d21e1
+          cargo test --all-features
       - name: check formatting
         run: cargo fmt -- --check
   windows:
     runs-on: windows-latest
     strategy:
       matrix:
-        version:
-          - stable
-          - nightly
         target:
           - x86_64-pc-windows-gnu
           - x86_64-pc-windows-msvc
@@ -51,31 +44,34 @@ jobs:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
         with:
-          toolchain: ${{ matrix.version }}
+          toolchain: "1.90"
           override: true
           components: llvm-tools-preview
       - name: test
         run: |
           cargo install cargo-binutils@0.3.6
+          # NOTE: only tests default features
           cargo test
   mac:
     runs-on: macos-latest
     strategy:
       matrix:
-        version:
-          - stable
-          - nightly
         target:
-          - x86_64-apple-darwin	
+          - x86_64-apple-darwin
+          - aarch64-apple-darwin
       fail-fast: false
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
         with:
-          toolchain: ${{ matrix.version }}
+          toolchain: "1.90"
           override: true
           components: llvm-tools-preview
       - name: test
         run: |
           cargo install cargo-binutils@0.3.6
+          # NOTE: only tests default features
           cargo test
+          # we run the nightly test here to distribute CPU time away from the linux runner
+          # we only run `profdata` because some ignored tests in `cov` fail
+          cargo test --test profdata -- --ignored

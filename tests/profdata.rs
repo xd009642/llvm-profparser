@@ -3,6 +3,8 @@ use serde::Deserialize;
 use std::collections::{HashMap, HashSet};
 use std::ffi::OsStr;
 use std::fs::read_dir;
+use std::io::BufRead as _;
+use std::iter::FromIterator as _;
 use std::path::PathBuf;
 use std::process::Command;
 use std::sync::LazyLock;
@@ -53,51 +55,107 @@ fn data_root_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/profdata")
 }
 
-fn get_data_dir() -> PathBuf {
-    let output = Command::new("cargo").arg("-vV").output().unwrap();
-    let version_info = String::from_utf8_lossy(&output.stdout);
-    println!("Version info: {}", version_info);
-    cfg_if::cfg_if! {
-        if #[cfg(llvm_11)] {
-            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests").join("data").join("profdata").join("llvm-11")
-        } else if #[cfg(llvm_12)] {
-            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests").join("data").join("profdata").join("llvm-12")
-        } else if #[cfg(llvm_13)] {
-            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests").join("data").join("profdata").join("llvm-13")
-        } else if #[cfg(llvm_14)] {
-            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests").join("data").join("profdata").join("llvm-14")
-        } else if #[cfg(llvm_15)] {
-            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests").join("data").join("profdata").join("llvm-15")
-        } else if #[cfg(llvm_16)] {
-            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests").join("data").join("profdata").join("llvm-16")
-        } else if #[cfg(llvm_17)] {
-            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests").join("data").join("profdata").join("llvm-17")
-        } else if #[cfg(llvm_18)] {
-            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests").join("data").join("profdata").join("llvm-18")
-        } else if #[cfg(llvm_19)] {
-            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests").join("data").join("profdata").join("llvm-19")
-        } else if #[cfg(llvm_20)] {
-            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests").join("data").join("profdata").join("llvm-20")
-        } else if #[cfg(llvm_21)] {
-            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests").join("data").join("profdata").join("llvm-21")
-        } else {
-            let rustc = env::var("RUSTC").unwrap();
-            let output = Command::new(rustc).arg("-vV").output().unwrap();
-            let version_info = String::from_utf8_lossy(&output.stdout);
-            println!("{}", version_info);
-            data_root_dir()
-        }
-    }
+// map of { llvm: rustc } versions
+static SUPPORTED_LLVM_VERSIONS: LazyLock<HashMap<u8, &str>> = LazyLock::new(|| {
+    LazyLock::force(&ASSERT_CMDS_EXIST);
+
+    let map = HashMap::from_iter([
+        #[cfg(feature = "__llvm_11")]
+        (11, "1.51"),
+        #[cfg(feature = "__llvm_12")]
+        (12, "1.55"),
+        #[cfg(feature = "__llvm_13")]
+        (13, "1.57"),
+        #[cfg(feature = "__llvm_14")]
+        (14, "1.64"),
+        #[cfg(feature = "__llvm_15")]
+        (15, "1.69"),
+        #[cfg(feature = "__llvm_16")]
+        (16, "1.72"),
+        #[cfg(feature = "__llvm_17")]
+        (17, "1.77"),
+        #[cfg(feature = "__llvm_18")]
+        (18, "1.81"),
+        #[cfg(feature = "__llvm_19")]
+        (19, "1.86"),
+        #[cfg(feature = "__llvm_20")]
+        (20, "1.90"),
+        // TODO: pin this to 1.91 once it releases
+        #[cfg(feature = "__llvm_21")]
+        (21, "nightly-2025-09-07"),
+    ]);
+
+    // Install all the versions we care about.
+    // TODO: this is slow :/ but adding a stamp file is non-trivial because it needs to account for
+    // which rustc versions are present in the map.
+    println!("installing {} rustc versions", map.len());
+    let status = Command::new("rustup")
+        .args(&[
+            "install",
+            "--profile=minimal",
+            "--component=llvm-tools-preview",
+            "--no-self-update",
+        ])
+        .args(map.values())
+        .status();
+    assert!(
+        status.ok().is_some_and(|s| s.success()),
+        "failed to install rustc versions"
+    );
+
+    map
+});
+
+static LATEST_SUPPORTED_VERSION: u8 = 21;
+
+#[test]
+// this test is 'heavy', since it downloads a new toolchain each day.
+// make it opt-in with `cargo test -- --ignored`.
+#[ignore]
+fn latest_llvm_supported() {
+    let status = Command::new("rustup")
+        .args(&["update", "nightly", "--no-self-update"])
+        .status();
+    assert!(
+        status.ok().is_some_and(|s| s.success()),
+        "failed to update nightly",
+    );
+    let rustc_vv = Command::new("rustc")
+        .arg("+nightly")
+        .arg("-vV")
+        .output()
+        .expect("failed to get rustc +nightly version")
+        .stdout;
+    let last_line = rustc_vv.lines().last().unwrap().unwrap();
+    let llvm_v = last_line
+        .split("LLVM version: ")
+        .nth(1)
+        .expect("no llvm version?");
+    let llvm_major_v: u8 = llvm_v
+        .split('.')
+        .next()
+        .expect("LLVM version format changed?")
+        .parse()
+        .expect("LLVM major version not a u8?");
+    assert_eq!(llvm_major_v, LATEST_SUPPORTED_VERSION);
 }
 
-fn check_merge_command(files: &[PathBuf], id: &str) {
+fn get_data_dir(llvm_version: u8) -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests")
+        .join("data")
+        .join("profdata")
+        .join(format!("llvm-{llvm_version}"))
+}
+
+fn check_merge_command(files: &[PathBuf], id: &str, rustc_version: &str) {
     let llvm_output = PathBuf::from(format!("llvm_{}.profdata", id));
     let names = files
         .iter()
         .map(|x| x.display().to_string())
         .collect::<Vec<String>>();
     let llvm = Command::new("cargo")
-        .args(&["profdata", "--", "merge"])
+        .args(&[&format!("+{rustc_version}"), "profdata", "--", "merge"])
         .args(&names)
         .arg("-o")
         .arg(&llvm_output)
@@ -146,12 +204,13 @@ static ASSERT_CMDS_EXIST: LazyLock<()> = LazyLock::new(|| {
         .success();
 });
 
-fn check_command(ext: &OsStr) {
-    LazyLock::force(&ASSERT_CMDS_EXIST);
-
+fn check_command(ext: &OsStr, llvm_version: u8) {
     // TODO we should consider doing different permutations of args. Some things which rely on
     // the ordering of elements in a priority_queue etc will display differently though...
-    let data = get_data_dir();
+    let data = get_data_dir(llvm_version);
+    let rustc_version = SUPPORTED_LLVM_VERSIONS
+        .get(&llvm_version)
+        .expect("unsupported llvm version?");
     println!("Data directory: {}", data.display());
     let mut count = 0;
     for raw_file in read_dir(&data)
@@ -164,7 +223,14 @@ fn check_command(ext: &OsStr) {
         // llvm comes with by default. So first we check if it works and if so we test
         let llvm = Command::new("cargo")
             .current_dir(&data)
-            .args(&["profdata", "--", "show", "--all-functions", "--counts"])
+            .args(&[
+                &format!("+{rustc_version}"),
+                "profdata",
+                "--",
+                "show",
+                "--all-functions",
+                "--counts",
+            ])
             .arg(raw_file.file_name())
             .output()
             .expect("cargo not installed???");
@@ -183,7 +249,12 @@ fn check_command(ext: &OsStr) {
                 .expect("Failed to run profparser on file");
             println!("{}", String::from_utf8_lossy(&rust.stderr));
 
-            let rust_struct: Output = serde_yaml::from_slice(&rust.stdout).unwrap();
+            let mut rust_struct: Output = serde_yaml::from_slice(&rust.stdout).unwrap();
+            if llvm_version == 11
+                && rust_struct.instrumentation_level == Some("IR  entry_first = 0".into())
+            {
+                rust_struct.instrumentation_level = Some("IR".into());
+            }
 
             assert_eq!(rust_struct, llvm_struct);
         } else {
@@ -194,14 +265,16 @@ fn check_command(ext: &OsStr) {
         }
     }
     if count == 0 {
-        panic!("No tests for this LLVM version");
+        panic!("No tests for LLVM version {}", llvm_version);
     }
 }
 
-fn check_against_text(ext: &OsStr) {
-    LazyLock::force(&ASSERT_CMDS_EXIST);
+fn check_against_text(ext: &OsStr, llvm_version: u8) {
+    let data = get_data_dir(llvm_version);
+    let rustc_version = SUPPORTED_LLVM_VERSIONS
+        .get(&llvm_version)
+        .expect("unsupported llvm version?");
 
-    let data = get_data_dir();
     let mut count = 0;
     for raw_file in read_dir(&data)
         .unwrap()
@@ -212,6 +285,7 @@ fn check_against_text(ext: &OsStr) {
         let llvm = Command::new("cargo")
             .current_dir(&data)
             .args(&[
+                &format!("+{rustc_version}"),
                 "profdata",
                 "--",
                 "show",
@@ -263,33 +337,41 @@ fn check_against_text(ext: &OsStr) {
 #[test]
 fn show_profraws() {
     let ext = OsStr::new("profraw");
-    check_command(ext);
+    for &llvm_version in SUPPORTED_LLVM_VERSIONS.keys() {
+        println!("testing profraws for llvm version {llvm_version}");
+        check_command(ext, llvm_version);
+    }
 }
 
 #[test]
 fn show_proftexts() {
     let ext = OsStr::new("proftext");
-    check_command(ext);
+    for &llvm_version in SUPPORTED_LLVM_VERSIONS.keys() {
+        println!("testing proftext for llvm version {llvm_version}");
+        check_command(ext, llvm_version);
+    }
 }
 
 #[test]
 fn show_profdatas() {
     let ext = OsStr::new("profdata");
     // Ordering of elements in printout make most of these tests troublesome
-    check_against_text(ext);
+    for &llvm_version in SUPPORTED_LLVM_VERSIONS.keys() {
+        check_against_text(ext, llvm_version);
+    }
 }
 
 #[test]
-#[cfg_attr(any(llvm_15, llvm_16), ignore)]
 fn merge() {
-    let data = get_data_dir();
-    let files = [
-        data.join("foo3bar3-1.proftext"),
-        data.join("foo3-1.proftext"),
-        data.join("foo3-2.proftext"),
-    ];
-
-    check_merge_command(&files, "foo_results");
+    for (llvm_version, rustc_version) in &*SUPPORTED_LLVM_VERSIONS {
+        let data = get_data_dir(*llvm_version);
+        let files = [
+            data.join("foo3bar3-1.proftext"),
+            data.join("foo3-1.proftext"),
+            data.join("foo3-2.proftext"),
+        ];
+        check_merge_command(&files, "foo_results", rustc_version);
+    }
 }
 
 #[test]

@@ -267,7 +267,6 @@ impl InstrProfReader for TextInstrProf {
             } else if check_tag(name, ENTRY_TAG) {
                 entry_first = true;
             } else if !check_tag(name, FE_TAG) {
-                // return Err(Err::Failure(Error::new(bytes, ErrorKind::Tag)));
                 return Err(Err::Failure(VerboseError::from_error_kind(
                     bytes,
                     ErrorKind::Tag,

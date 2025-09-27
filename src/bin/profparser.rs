@@ -284,15 +284,12 @@ impl ShowCommand {
             }
         }
         if profile.get_level() == InstrumentationLevel::Ir {
-            // This is just to enable same printout in older versions with llvm 11
-            #[cfg(not(llvm_11))]
             println!(
                 "Instrumentation level: {}  entry_first = {}",
                 profile.get_level(),
+                // NOTE: in llvm 11 this is always false
                 profile.is_entry_first() as usize
             );
-            #[cfg(llvm_11)]
-            println!("Instrumentation level: {}", profile.get_level());
         } else {
             println!("Instrumentation level: {}", profile.get_level());
         }
