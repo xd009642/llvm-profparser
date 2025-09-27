@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Basic MC/DC parsing in object files
 - llvm 21 into tests
 
+### Fixed
+- Non-version number flags in version field weren't masked out when using version for indexed profile parsing of causing parse errors.
+
 ## [0.8.3]
 ### Changed
 - Saturating operations on expression adding/subtracting to avoid panics
