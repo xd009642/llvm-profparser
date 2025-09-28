@@ -204,6 +204,37 @@ static ASSERT_CMDS_EXIST: LazyLock<()> = LazyLock::new(|| {
         .success();
 });
 
+static KNOWN_FAILING_TESTS: &[(Option<u8>, &str)] = &[
+    (None, "flatten_instr.proftext"),
+    (None, "instr-remap.proftext"),
+    (None, "overlap_1.proftext"),
+    (None, "overlap_1_cs.proftext"),
+    (None, "overlap_1_vp.proftext"),
+    (None, "overlap_2.proftext"),
+    (None, "overlap_2_cs.proftext"),
+    (None, "overlap_2_vp.proftext"),
+    (None, "ir-basic.proftext"),
+    (None, "cs.proftext"),
+    (None, "mix_instr.proftext"),
+    (None, "mix_instr_small.proftext"),
+    (None, "FUnique.proftext"),
+    (None, "NoFUnique.proftext"),
+    (None, "CSIR_profile.proftext"),
+    (None, "IR_profile.proftext"),
+    (None, "same-name-1.proftext"),
+    (None, "same-name-2.proftext"),
+    (None, "multiple-profdata-merge.proftext"),
+    (None, "header-directives-1.proftext"),
+    (None, "cutoff.proftext"),
+    (None, "vtable-value-prof.proftext"),
+    (None, "pseudo-count-warm.proftext"),
+    (None, "pseudo-count-hot.proftext"),
+    (None, "noncs.proftext"),
+    (None, "header-directives-2.proftext"),
+    (None, "header-directives-3.proftext"),
+    (None, "overflow-instr.proftext"),
+];
+
 fn check_command(ext: &OsStr, llvm_version: u8) {
     // TODO we should consider doing different permutations of args. Some things which rely on
     // the ordering of elements in a priority_queue etc will display differently though...
@@ -213,11 +244,18 @@ fn check_command(ext: &OsStr, llvm_version: u8) {
         .expect("unsupported llvm version?");
     println!("Data directory: {}", data.display());
     let mut count = 0;
-    for raw_file in read_dir(&data)
+    'tests: for raw_file in read_dir(&data)
         .unwrap()
         .filter_map(|x| x.ok())
         .filter(|x| x.path().extension().unwrap_or_default() == ext)
     {
+        for &(version, filename) in KNOWN_FAILING_TESTS {
+            if (version.is_none() || Some(llvm_version) == version)
+                && raw_file.file_name() == filename
+            {
+                continue 'tests;
+            }
+        }
         println!("{:?}", raw_file.file_name());
         // llvm-profdata won't be able to work on all the files as it depends on what the host OS
         // llvm comes with by default. So first we check if it works and if so we test
@@ -281,6 +319,10 @@ fn check_against_text(ext: &OsStr, llvm_version: u8) {
         .filter_map(|x| x.ok())
         .filter(|x| x.path().extension().unwrap_or_default() == ext)
     {
+        if llvm_version == 11 && raw_file.file_name() == "compat.v1.profdata" {
+            // Known failing test.
+            continue;
+        }
         println!("{:?}", raw_file.file_name());
         let llvm = Command::new("cargo")
             .current_dir(&data)

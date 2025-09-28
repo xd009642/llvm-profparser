@@ -8,7 +8,11 @@ This is a reasonably complete to parse the llvm instrumentation profraw file
 format and avoid the need to install and use the llvm-profdata/llvm-cov
 binaries. It aims to be backwards compatible with as many llvm versions that
 could be used for coverage data in Rust projects and currently supports the
-following llvm versions: 11, 12, 13, 14, 15. 
+following llvm versions: 11-21. Support for LLVM 11 is only partial.
+
+This parser supports the "instrumentation" profile format, but not the
+"sampling" or "memory access" profile format. For those, use `llvm-profdata`
+directly.
 
 **This project is not affilated with the llvm-project in anyway!** It is merely
 a parser for some of their file formats to aid interoperability in Rust.
