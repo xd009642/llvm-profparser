@@ -192,7 +192,6 @@ impl Expression {
 }
 
 impl Counter {
-    const ENCODING_TAG_BITS: u64 = 2;
     const ENCODING_TAG_MASK: u64 = 3;
     const ENCODING_TAG_AND_EXP_REGION_BITS: u64 = 3;
     const ENCODING_EXPANSION_REGION_BIT: u64 = 4;
