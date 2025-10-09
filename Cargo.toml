@@ -14,7 +14,7 @@ rust-version = "1.80.0"
 
 [features]
 default = ["cli", "__llvm_20"]
-cli = ["structopt", "tracing-subscriber"]
+cli = ["clap", "tracing-subscriber"]
 
 # for testing
 # to run all tests, run `cargo test --all-features`.
@@ -41,7 +41,7 @@ md5 = "0.7"
 nom = "7.0.0"
 object = "0.26.0"
 rustc-hash = "2.1"
-structopt = { version = "0.3.21", optional = true }
+clap = { version = "4", features = ["derive"], optional = true }
 thiserror = "1.0.30"
 tracing = "0.1.37"
 tracing-subscriber = { version = "0.3.16", optional = true }

@@ -1,34 +1,34 @@
 use anyhow::Result;
+use clap::Parser;
 use llvm_profparser::instrumentation_profile::summary::*;
 use llvm_profparser::instrumentation_profile::types::*;
 use llvm_profparser::*;
 use std::cmp::Ordering;
 use std::collections::BinaryHeap;
 use std::path::PathBuf;
-use structopt::StructOpt;
 use tracing_subscriber::filter::filter_fn;
 use tracing_subscriber::{Layer, Registry};
 
-#[derive(Clone, Debug, Eq, PartialEq, StructOpt)]
+#[derive(Clone, Debug, Eq, PartialEq, Parser)]
 pub enum Command {
     Show {
-        #[structopt(flatten)]
+        #[command(flatten)]
         show: ShowCommand,
     },
     Merge {
-        #[structopt(flatten)]
+        #[command(flatten)]
         merge: MergeCommand,
     },
     Overlap {
-        #[structopt(flatten)]
+        #[command(flatten)]
         overlap: OverlapCommand,
     },
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, StructOpt)]
+#[derive(Clone, Debug, Eq, PartialEq, Parser)]
 pub struct ShowCommand {
     /// Input profraw file to show some information about
-    #[structopt(name = "<filename...>", long = "input", short = "i")]
+    #[structopt(name = "<filename...>", long = "input", short = 'i')]
     input: PathBuf,
     /// Show counter values for shown functions
     #[structopt(long = "counts")]
@@ -55,7 +55,7 @@ pub struct ShowCommand {
     #[structopt(long = "function")]
     function: Option<String>,
     /// Output file
-    #[structopt(long = "output", short = "o")]
+    #[structopt(long = "output", short = 'o')]
     output: Option<String>,
     /// Show the list of functions with the largest internal counts
     #[structopt(long = "topn")]
@@ -80,32 +80,32 @@ pub struct ShowCommand {
     debug: bool,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, StructOpt)]
+#[derive(Clone, Debug, Eq, PartialEq, Parser)]
 pub struct MergeCommand {
     /// Input files to merge
-    #[structopt(name = "<filename...>", long = "input", short = "i")]
+    #[structopt(name = "<filename...>", long = "input", short = 'i')]
     input: Vec<PathBuf>,
     /// Output file
-    #[structopt(long = "output", short = "o")]
+    #[structopt(long = "output", short = 'o')]
     output: PathBuf,
     /// List of weights and filenames in `<weight>,<filename>` format
-    #[structopt(long = "weighted-input", parse(try_from_str=try_parse_weighted))]
+    #[structopt(long = "weighted-input", value_parser=try_parse_weighted)]
     weighted_input: Vec<(u64, String)>,
     /// Number of merge threads to use (will autodetect by default)
-    #[structopt(long = "num-threads", short = "j")]
+    #[structopt(long = "num-threads", short = 'j')]
     jobs: Option<usize>,
     /// Turn on debug logging
     #[structopt(long)]
     debug: bool,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, StructOpt)]
+#[derive(Clone, Debug, Eq, PartialEq, Parser)]
 pub struct OverlapCommand {
     #[structopt(name = "<base profile file>")]
     base_file: PathBuf,
     #[structopt(name = "<test profile file>")]
     test_file: PathBuf,
-    #[structopt(long = "output", short = "o")]
+    #[structopt(long = "output", short = 'o')]
     output: Option<PathBuf>,
     /// For context sensitive counts
     #[structopt(long = "cs")]
@@ -125,9 +125,9 @@ pub struct OverlapCommand {
     debug: bool,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, StructOpt)]
+#[derive(Clone, Debug, Eq, PartialEq, Parser)]
 pub struct Opts {
-    #[structopt(subcommand)]
+    #[command(subcommand)]
     cmd: Command,
 }
 
@@ -357,7 +357,7 @@ fn enable_debug_logging() -> anyhow::Result<()> {
 }
 
 fn main() -> Result<()> {
-    let opts = Opts::from_args();
+    let opts = Opts::parse();
     if opts.debug() {
         let _ = enable_debug_logging();
     }

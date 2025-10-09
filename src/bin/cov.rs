@@ -1,26 +1,26 @@
 use anyhow::Result;
+use clap::{Parser, Subcommand};
 use llvm_profparser::*;
 use std::fs;
 use std::path::PathBuf;
-use structopt::StructOpt;
 use tracing_subscriber::filter::filter_fn;
 use tracing_subscriber::{Layer, Registry};
 
-#[derive(Clone, Debug, Eq, PartialEq, StructOpt)]
+#[derive(Clone, Debug, Eq, PartialEq, Parser)]
 pub struct Opts {
-    #[structopt(subcommand)]
+    #[command(subcommand)]
     cmd: Command,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, StructOpt)]
+#[derive(Clone, Debug, Eq, PartialEq, Subcommand)]
 pub enum Command {
     Show {
-        #[structopt(flatten)]
+        #[command(flatten)]
         show: ShowCommand,
     },
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, StructOpt)]
+#[derive(Clone, Debug, Eq, PartialEq, Parser)]
 pub struct ShowCommand {
     /// File with the profile data obtained after an instrumented run. This differs from llvm-cov
     /// in that if multiple profiles are given it will do the equivalent of a llvm-profdata merge
@@ -89,7 +89,7 @@ fn enable_debug_logging() -> anyhow::Result<()> {
 }
 
 fn main() -> Result<()> {
-    let opts = Opts::from_args();
+    let opts = Opts::parse();
     match opts.cmd {
         Command::Show { show } => show.run(),
     }
