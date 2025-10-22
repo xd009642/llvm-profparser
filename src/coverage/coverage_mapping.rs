@@ -200,7 +200,7 @@ impl<'a> CoverageMapping<'a> {
                             };
 
                             region_ids.insert(counter, count);
-                            if let Some(expr_region) = func.regions.iter().find(|x| {
+                            for expr_region in func.regions.iter().filter(|x| {
                                 x.count.is_expression() && x.count.id == expr_index as u64
                             }) {
                                 let result = report
@@ -256,7 +256,7 @@ impl<'a> CoverageMapping<'a> {
                             };
 
                             region_ids.insert(counter, count);
-                            if let Some(expr_region) = func.regions.iter().find(|x| {
+                            for expr_region in func.regions.iter().filter(|x| {
                                 x.count.is_expression() && x.count.id == *expr_index as u64
                             }) {
                                 let result = report
