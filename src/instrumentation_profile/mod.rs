@@ -2,7 +2,7 @@ use crate::instrumentation_profile::indexed_profile::*;
 use crate::instrumentation_profile::raw_profile::*;
 use crate::instrumentation_profile::text_profile::*;
 use crate::instrumentation_profile::types::*;
-use nom::{error::VerboseError, IResult};
+use nom::{error::VerboseError, Err, IResult};
 use std::fs::File;
 use std::io;
 use std::io::prelude::*;
@@ -43,9 +43,21 @@ pub fn parse_bytes(data: &[u8]) -> io::Result<InstrumentationProfile> {
             "Unsupported instrumentation profile format",
         ));
     };
-    nom_res.map(|(_bytes, res)| res).map_err(|_e| {
-        trace!("{}", _e);
-        io::Error::new(io::ErrorKind::Other, "Parsing failed")
+    nom_res.map(|(_bytes, res)| res).map_err(|e| {
+        // trace!("{}", e);
+        let verbose_error_message = |err: VerboseError<&[u8]>| {
+            err.errors
+                .iter()
+                .map(|(_, x)| format!("{:?}", x))
+                .collect::<Vec<String>>()
+                .join(" ")
+        };
+        let error_message = match e {
+            Err::Error(e) => format!("parser error: {}", verbose_error_message(e)),
+            Err::Failure(e) => format!("parser failure: {}", verbose_error_message(e)),
+            Err::Incomplete(_) => unreachable!("llvm_profparsers works on complete data"),
+        };
+        io::Error::new(io::ErrorKind::Other, error_message)
     })
 }
 
