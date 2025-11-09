@@ -101,7 +101,7 @@ fn read_value(
                 input = bytes;
             }
         }
-        // This should always be true 
+        // This should always be true
         if version > 2 {
             // If the version is > v2 then there can also be value profiling data so lets try and parse
             // that now
