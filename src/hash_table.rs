@@ -93,34 +93,45 @@ fn read_value(
             break;
         }
 
-        // If the version is > v2 then there can also be value profiling data so lets try and parse
-        // that now
-        let (bytes, total_size) = le_u32(input)?;
-        if bytes.len() <= end_len {
-            break;
+        if version > 10 {
+            let (bytes, bitmap_bytes) = le_u64(input)?;
+            input = bytes;
+            for _i in 0..bitmap_bytes {
+                let (bytes, _) = le_u64(input)?;
+                input = bytes;
+            }
         }
-        let (bytes, num_value_kinds) = le_u32(bytes)?;
-        // Here it's just less than because we don't need to read anything else so if it's equal to
-        // we're good
-        if bytes.len() < end_len {
-            break;
-        }
-        input = bytes;
-        let value_prof_data = ValueProfData {
-            total_size,
-            num_value_kinds,
-        };
-        if value_prof_data.num_value_kinds > 0 && version > 2 {
-            // If we actually want to change data in future get result.last_mut() and change it
-            // there
-            break;
+        // This should always be true 
+        if version > 2 {
+            // If the version is > v2 then there can also be value profiling data so lets try and parse
+            // that now
+            let (bytes, total_size) = le_u32(input)?;
+            if bytes.len() <= end_len {
+                break;
+            }
+            let (bytes, num_value_kinds) = le_u32(bytes)?;
+            // Here it's just less than because we don't need to read anything else so if it's equal to
+            // we're good
+            if bytes.len() < end_len {
+                break;
+            }
+            input = bytes;
+            let value_prof_data = ValueProfData {
+                total_size,
+                num_value_kinds,
+            };
+            if value_prof_data.num_value_kinds > 0 && version > 2 {
+                // If we actually want to change data in future get result.last_mut() and change it
+                // there
+                break;
+            }
         }
     }
     if result.is_empty() {
         result.push((last_hash, InstrProfRecord::default()));
     }
     input = expected_end;
-    assert_eq!(result.len(), 1);
+    assert!(!result.is_empty());
     Ok((input, result.remove(0)))
 }
 
@@ -142,6 +153,7 @@ impl HashTable {
         debug!("Number of hashtable buckets: {}", num_buckets);
         let (_bytes, mut num_entries) = le_u64(bytes)?;
         debug!("Number of entries: {}", num_entries);
+
         let mut payload = input;
         let mut result = Self::new();
         //TODO is this change right?
