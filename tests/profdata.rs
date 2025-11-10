@@ -491,3 +491,16 @@ fn check_raw_data_consistency() {
         std::assert_eq!(data_record, raw_record);
     }
 }
+
+// https://github.com/xd009642/llvm-profparser/issues/65 prevent regression on hash table parsing
+// changing
+#[test]
+fn hash_table_regression_check() {
+    let ferrocene = data_root_dir()
+        .join("misc")
+        .join("ferrocene-library-aarch64-apple-darwin.profdata");
+
+    // We've not locked this to version, but it's enough to parse it and making sure it parses
+    // correctly to prevent a regression.
+    parse(&ferrocene).unwrap();
+}

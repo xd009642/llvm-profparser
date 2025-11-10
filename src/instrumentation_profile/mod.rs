@@ -44,7 +44,7 @@ pub fn parse_bytes(data: &[u8]) -> io::Result<InstrumentationProfile> {
         ));
     };
     nom_res.map(|(_bytes, res)| res).map_err(|e| {
-        // trace!("{}", e);
+        trace!("{}", e);
         let verbose_error_message = |err: VerboseError<&[u8]>| {
             err.errors
                 .iter()
