@@ -28,7 +28,9 @@ use tracing::{debug, error, trace, warn};
 #[derive(Debug)]
 pub struct CoverageMapping<'a> {
     profile: &'a InstrumentationProfile,
-    pub mapping_info: Vec<CoverageMappingInfo>,
+    object_files: &'a [PathBuf],
+    allow_parsing_failures: bool,
+    version: u64,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -107,29 +109,20 @@ pub fn read_object_file(object: &Path, version: u64) -> Result<CoverageMappingIn
 
 impl<'a> CoverageMapping<'a> {
     pub fn new(
-        object_files: &[PathBuf],
+        object_files: &'a [PathBuf],
         profile: &'a InstrumentationProfile,
         allow_parsing_failures: bool,
     ) -> Result<Self> {
-        let mut mapping_info = vec![];
         let version = match profile.version() {
             Some(v) => v,
             None => bail!("Invalid profile instrumentation, no version number provided"),
         };
-        for file in object_files {
-            match read_object_file(file.as_path(), version) {
-                Ok(info) => mapping_info.push(info),
-                Err(e) => {
-                    error!("{} couldn't be interpretted: {}", file.display(), e);
-                    if !allow_parsing_failures {
-                        return Err(e);
-                    }
-                }
-            };
-        }
+
         Ok(Self {
             profile,
-            mapping_info,
+            object_files,
+            allow_parsing_failures,
+            version,
         })
     }
 
@@ -149,13 +142,15 @@ impl<'a> CoverageMapping<'a> {
         result
     }
 
-    pub fn generate_subreport<P>(&self, mut predicate: P) -> CoverageReport
+    pub fn generate_subreport<P>(&self, mut predicate: P) -> Result<CoverageReport>
     where
         P: FnMut(&[PathBuf]) -> bool,
     {
         let mut report = CoverageReport::default();
         //let base_region_ids = info.get_simple_counters(self.profile);
-        for info in &self.mapping_info {
+
+        for result in self.mapping_info_iter() {
+            let info = result?;
             for func in &info.cov_fun {
                 let base_region_ids = self.get_simple_counters(func);
                 let paths = info.get_files_from_id(func.header.filenames_ref);
@@ -276,11 +271,25 @@ impl<'a> CoverageMapping<'a> {
                 }
             }
         }
-        report
+        Ok(report)
     }
 
-    pub fn generate_report(&self) -> CoverageReport {
+    pub fn generate_report(&self) -> Result<CoverageReport> {
         self.generate_subreport(|_| true)
+    }
+
+    pub fn mapping_info_iter(&self) -> impl Iterator<Item = Result<CoverageMappingInfo>> + '_ {
+        self.object_files
+            .iter()
+            .map(move |object| (object, read_object_file(object, self.version)))
+            .skip_while(move |(object, result)| match result {
+                Err(ref e) if !self.allow_parsing_failures => {
+                    error!("{} couldn't be interpreted: {}", object.display(), e);
+                    true
+                }
+                _ => false,
+            })
+            .map(|(_, result)| result)
     }
 }
 
