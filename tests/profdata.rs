@@ -1,3 +1,4 @@
+use assert_cmd::cargo::cargo_bin;
 use llvm_profparser::{merge_profiles, parse, parse_bytes};
 use serde::Deserialize;
 use std::collections::{HashMap, HashSet};
@@ -278,8 +279,7 @@ fn check_command(ext: &OsStr, llvm_version: u8) {
         if llvm.status.success() {
             println!("Checking {:?}", raw_file.file_name());
             count += 1;
-            let rust = assert_cmd::Command::cargo_bin("profparser")
-                .unwrap()
+            let rust = Command::new(cargo_bin!("profparser"))
                 .current_dir(&data)
                 .args(&["show", "--all-functions", "--counts", "-i"])
                 .arg(raw_file.file_name())

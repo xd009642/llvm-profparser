@@ -1,3 +1,4 @@
+use assert_cmd::cargo::cargo_bin;
 use cargo_metadata::Message;
 use llvm_profparser::{parse, CoverageMapping};
 use pretty_assertions::assert_eq;
@@ -161,8 +162,7 @@ fn compare_reports(run: &Run) {
         .output()
         .unwrap();
 
-    let profparser_report = assert_cmd::Command::cargo_bin("cov")
-        .unwrap()
+    let profparser_report = Command::new(cargo_bin!("cov"))
         .args(&["show", "--instr-profile"])
         .arg(&run.profraw)
         .arg("--object")
@@ -191,8 +191,7 @@ fn compare_reports(run: &Run) {
 #[test]
 fn check_matches() {
     let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/");
-    let profparser_report = assert_cmd::Command::cargo_bin("cov")
-        .unwrap()
+    let profparser_report = Command::new(cargo_bin!("cov"))
         .current_dir(&dir)
         .args(&[
             "show",
