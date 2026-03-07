@@ -108,7 +108,7 @@ static SUPPORTED_LLVM_VERSIONS: LazyLock<HashMap<u8, &str>> = LazyLock::new(|| {
     map
 });
 
-static LATEST_SUPPORTED_VERSION: u8 = 21;
+static LATEST_SUPPORTED_VERSION: u8 = 22;
 
 #[test]
 // this test is 'heavy', since it downloads a new toolchain each day.
