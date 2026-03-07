@@ -81,9 +81,10 @@ static SUPPORTED_LLVM_VERSIONS: LazyLock<HashMap<u8, &str>> = LazyLock::new(|| {
         (19, "1.86"),
         #[cfg(feature = "__llvm_20")]
         (20, "1.90"),
-        // TODO: pin this to 1.91 once it releases
         #[cfg(feature = "__llvm_21")]
-        (21, "nightly-2025-09-07"),
+        (21, "1.91"),
+        #[cfg(feature = "__llvm_22")]
+        (22, "nightly-2026-02-15"),
     ]);
 
     // Install all the versions we care about.
@@ -107,7 +108,7 @@ static SUPPORTED_LLVM_VERSIONS: LazyLock<HashMap<u8, &str>> = LazyLock::new(|| {
     map
 });
 
-static LATEST_SUPPORTED_VERSION: u8 = 21;
+static LATEST_SUPPORTED_VERSION: u8 = 22;
 
 #[test]
 // this test is 'heavy', since it downloads a new toolchain each day.
