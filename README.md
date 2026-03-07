@@ -4,7 +4,7 @@
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Coverage Status](https://coveralls.io/repos/github/xd009642/llvm-profparser/badge.svg?branch=master)](https://coveralls.io/github/xd009642/llvm-profparser?branch=master)
 
-This is a reasonably complete to parse the llvm instrumentation profraw file
+This is a reasonably complete project to parse the llvm instrumentation profraw file
 format and avoid the need to install and use the llvm-profdata/llvm-cov
 binaries. It aims to be backwards compatible with as many llvm versions that
 could be used for coverage data in Rust projects and currently supports the
