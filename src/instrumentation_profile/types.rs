@@ -351,8 +351,6 @@ type InstrProfValueSiteRecord = Vec<InstrProfValueData>;
 fn merge_site_records(dst: &mut InstrProfValueSiteRecord, src: &InstrProfValueSiteRecord) {
     if dst.len() == src.len() {
         dst.sort_unstable();
-        let mut other_vals = src.iter().map(|x| x.value).collect::<Vec<u64>>();
-        other_vals.sort_unstable();
         let mut i = 0;
         for j in src {
             let current = dst
@@ -364,7 +362,6 @@ fn merge_site_records(dst: &mut InstrProfValueSiteRecord, src: &InstrProfValueSi
             match current {
                 Some((index, element)) if element.value == j.value => {
                     element.count = element.count.checked_add(j.count).unwrap_or(u64::MAX);
-                    dst.insert(index + 1, j.clone());
                     i = index + 1;
                 }
                 Some((index, _)) => {
@@ -437,4 +434,85 @@ pub struct DecisionParameters {
 pub enum MCDCParams {
     Branch(BranchParameters),
     Decision(DecisionParameters),
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Merges value profile sites by profiled value so repeated targets are combined once.
+    #[test]
+    fn merge_value_profile_sites_combines_matching_values() {
+        let mut base = InstrProfRecord {
+            counts: vec![10, 20],
+            data: Some(Box::new(ValueProfDataRecord {
+                indirect_callsites: vec![vec![
+                    InstrProfValueData { value: 1, count: 1 },
+                    InstrProfValueData { value: 2, count: 2 },
+                ]],
+                mem_op_sizes: vec![vec![
+                    InstrProfValueData {
+                        value: 16,
+                        count: 3,
+                    },
+                    InstrProfValueData {
+                        value: 32,
+                        count: 4,
+                    },
+                ]],
+            })),
+        };
+        let other = InstrProfRecord {
+            counts: vec![5, 7],
+            data: Some(Box::new(ValueProfDataRecord {
+                indirect_callsites: vec![vec![
+                    InstrProfValueData { value: 2, count: 5 },
+                    InstrProfValueData { value: 3, count: 8 },
+                ]],
+                mem_op_sizes: vec![vec![
+                    InstrProfValueData {
+                        value: 32,
+                        count: 6,
+                    },
+                    InstrProfValueData {
+                        value: 64,
+                        count: 9,
+                    },
+                ]],
+            })),
+        };
+
+        base.merge(&other);
+
+        let value_data = base
+            .data
+            .as_ref()
+            .expect("merged record should retain value profile data");
+        assert_eq!(base.counts, vec![15, 27]);
+        assert_eq!(
+            value_data.indirect_callsites,
+            vec![vec![
+                InstrProfValueData { value: 1, count: 1 },
+                InstrProfValueData { value: 2, count: 7 },
+                InstrProfValueData { value: 3, count: 8 },
+            ]]
+        );
+        assert_eq!(
+            value_data.mem_op_sizes,
+            vec![vec![
+                InstrProfValueData {
+                    value: 16,
+                    count: 3,
+                },
+                InstrProfValueData {
+                    value: 32,
+                    count: 10,
+                },
+                InstrProfValueData {
+                    value: 64,
+                    count: 9,
+                },
+            ]]
+        );
+    }
 }
