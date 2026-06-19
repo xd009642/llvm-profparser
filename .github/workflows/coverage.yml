@@ -22,5 +22,5 @@ jobs:
       - name: code-coverage
         run: |
           cargo install cargo-binutils@0.3.6
-          cargo install  --version 0.19.1 cargo-tarpaulin
-          cargo tarpaulin --force-clean --exclude-files tests/data/* benches/* --follow-exec --coveralls ${{ secrets.CODECOV_TOKEN }}
+          cargo install cargo-tarpaulin
+          cargo tarpaulin --force-clean --exclude-files tests/data/* benches/* --follow-exec --coveralls ${{ secrets.CODECOV_TOKEN }} --engine llvm

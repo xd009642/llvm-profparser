@@ -383,4 +383,125 @@ mod tests {
         assert_eq!(rec.record.counts, vec![100]);
         assert_eq!(rec.record.data, None);
     }
+
+    /// Parses LLVM text-format indirect call target records, including a site with no values.
+    #[test]
+    fn parse_text_value_profile_indirect_call_sites() {
+        let profile = b"main
+# Func Hash:
+16650
+# Num Counters:
+4
+# Counter Values:
+2
+2000
+2000000
+999000
+# NumValueKinds
+1
+# Value Kind IPVK_IndirectCallTarget
+0
+# NumSites
+3
+# Values for each site
+0
+2
+foo:100
+foo2:1000
+1
+foo2:20000
+";
+
+        let (_, report) = TextInstrProf::parse_bytes(profile)
+            .expect("text profile with indirect call targets should parse");
+        let record = report
+            .find_record_by_name("main")
+            .expect("main record should be present");
+        let value_data = record
+            .record
+            .data
+            .as_ref()
+            .expect("value profile data should be present");
+
+        assert_eq!(record.record.counts, vec![2, 2000, 2000000, 999000]);
+        assert_eq!(value_data.indirect_callsites.len(), 3);
+        assert_eq!(value_data.indirect_callsites[0], vec![]);
+        assert_eq!(
+            value_data.indirect_callsites[1],
+            vec![
+                InstrProfValueData {
+                    value: compute_hash("foo"),
+                    count: 100
+                },
+                InstrProfValueData {
+                    value: compute_hash("foo2"),
+                    count: 1000
+                },
+            ]
+        );
+        assert_eq!(
+            value_data.indirect_callsites[2],
+            vec![InstrProfValueData {
+                value: compute_hash("foo2"),
+                count: 20000
+            }]
+        );
+        assert!(value_data.mem_op_sizes.is_empty());
+    }
+
+    /// Parses LLVM text-format memory operation size value profile records.
+    #[test]
+    fn parse_text_value_profile_memop_sites() {
+        let profile = b"foo
+# Func Hash:
+35277121310
+# Num Counters:
+3
+# Counter Values:
+20
+556
+1
+# Num Value Kinds:
+1
+# ValueKind = IPVK_MemOPSize:
+1
+# NumValueSites:
+1
+3
+1:99
+9:72
+4:66
+";
+
+        let (_, report) = TextInstrProf::parse_bytes(profile)
+            .expect("text profile with memop sizes should parse");
+        let record = report
+            .find_record_by_name("foo")
+            .expect("foo record should be present");
+        let value_data = record
+            .record
+            .data
+            .as_ref()
+            .expect("value profile data should be present");
+
+        assert_eq!(record.record.counts, vec![20, 556, 1]);
+        assert!(value_data.indirect_callsites.is_empty());
+        assert_eq!(
+            value_data.mem_op_sizes,
+            vec![vec![
+                InstrProfValueData {
+                    value: 1,
+                    count: 99
+                },
+                InstrProfValueData {
+                    value: 9,
+                    count: 72
+                },
+                InstrProfValueData {
+                    value: 4,
+                    count: 66
+                },
+            ]]
+        );
+    }
 }
