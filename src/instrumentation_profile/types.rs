@@ -34,6 +34,14 @@ pub struct Symtab {
     pub names: FxHashMap<u64, String>,
 }
 
+impl Symtab {
+    pub(crate) fn with_capacity(capacity: usize) -> Self {
+        let mut names = FxHashMap::default();
+        names.reserve(capacity);
+        Self { names }
+    }
+}
+
 pub fn compute_hash(data: impl AsRef<[u8]>) -> u64 {
     let hash = md5::compute(data).0[..8].try_into().unwrap_or_default();
     u64::from_le_bytes(hash)
@@ -122,6 +130,22 @@ impl InstrumentationProfile {
             is_entry_first,
             ..Default::default()
         }
+    }
+
+    pub(crate) fn with_capacity(capacity: usize) -> Self {
+        let mut record_name_lookup = FxHashMap::default();
+        record_name_lookup.reserve(capacity);
+        Self {
+            records: Vec::with_capacity(capacity),
+            record_name_lookup,
+            symtab: Symtab::with_capacity(capacity),
+            ..Default::default()
+        }
+    }
+
+    pub(crate) fn reserve_records(&mut self, additional: usize) {
+        self.records.reserve(additional);
+        self.record_name_lookup.reserve(additional);
     }
 
     pub fn version(&self) -> Option<u64> {

@@ -25,18 +25,14 @@ pub fn merge_profiles<T>(files: &[T]) -> std::io::Result<InstrumentationProfile>
 where
     T: AsRef<Path>,
 {
-    if files.is_empty() {
-        Ok(InstrumentationProfile::default())
-    } else {
-        let mut profiles = vec![];
-        for input in files {
-            let profile = parse(input)?;
-            profiles.push(profile);
-        }
-        let mut base = profiles.remove(0);
-        for profile in &profiles {
-            base.merge(profile);
-        }
-        Ok(base)
+    let Some((first, rest)) = files.split_first() else {
+        return Ok(InstrumentationProfile::default());
+    };
+
+    let mut base = parse(first)?;
+    for input in rest {
+        let profile = parse(input)?;
+        base.merge(&profile);
     }
+    Ok(base)
 }
