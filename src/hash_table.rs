@@ -6,6 +6,7 @@ use nom::{
 };
 use std::borrow::Cow;
 use std::mem::size_of;
+use std::sync::Arc;
 use tracing::debug;
 
 #[derive(Copy, Clone, Debug)]
@@ -15,7 +16,7 @@ struct KeyDataLen {
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct HashTable(pub IndexMap<(u64, String), InstrProfRecord>);
+pub(crate) struct HashTable(pub IndexMap<(u64, u64, Arc<str>), InstrProfRecord>);
 
 fn read_key_data_len(input: &[u8]) -> ParseResult<'_, KeyDataLen> {
     let (bytes, key_len) = le_u64(input)?;
@@ -179,14 +180,15 @@ impl HashTable {
         );
         let mut remaining = bytes;
         for _i in 0..num_items_in_bucket {
-            let (bytes, _hash) = le_u64(remaining)?;
-            debug!("Hash(?): {}", _hash);
+            let (bytes, name_hash) = le_u64(remaining)?;
+            debug!("Name hash: {}", name_hash);
             let (bytes, lens) = read_key_data_len(bytes)?;
             let (bytes, key) = read_key(bytes, lens.key_len as usize)?;
             debug!("lengths: {:?} and key: {}", lens, key);
             let (bytes, (hash, value)) = read_value(version, bytes, lens.data_len as usize)?;
             debug!("hash: {}, value: {:?}", hash, value);
-            self.0.insert((hash, key.to_string()), value);
+            self.0
+                .insert((hash, name_hash, Arc::from(key.as_ref())), value);
             assert!(num_entries > 0);
             num_entries -= 1;
 
