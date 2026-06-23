@@ -15,6 +15,7 @@ use nom::{InputIter, InputLength, Slice};
 use std::convert::TryInto;
 use std::fmt::{Debug, Display};
 use std::mem::size_of;
+use std::sync::Arc;
 use tracing::{debug, error, trace};
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Ord, PartialOrd)]
@@ -403,7 +404,7 @@ where
                 input = new_bytes;
                 for name in names.split(INSTR_PROF_NAME_SEP) {
                     debug!("Symbol name parsed: '{}'", name);
-                    symtab.add_func_name(name.to_string(), Some(header.endianness));
+                    symtab.add_func_name(Arc::from(name), Some(header.endianness));
                 }
             }
             let padding = get_num_padding_bytes(header.names_len);

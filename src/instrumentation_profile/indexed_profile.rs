@@ -8,6 +8,7 @@ use nom::{
 };
 use rustc_hash::FxHashMap;
 use std::convert::TryFrom;
+use std::sync::Arc;
 use tracing::debug;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
@@ -194,8 +195,8 @@ impl InstrProfReader for IndexedInstrProf {
         profile.reserve_records(table.0.len());
         profile.symtab.names.reserve(table.0.len());
         for ((hash, name), v) in &table.0 {
-            let name = name.to_string();
-            let name_hash = compute_hash(&name);
+            let name = Arc::<str>::from(name.as_str());
+            let name_hash = compute_hash(name.as_bytes());
             profile
                 .symtab
                 .add_func_name_with_hash(name.clone(), name_hash);

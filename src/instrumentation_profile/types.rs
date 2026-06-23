@@ -3,6 +3,7 @@ use rustc_hash::FxHashMap;
 use std::cmp::Ordering;
 use std::convert::TryInto;
 use std::fmt;
+use std::sync::Arc;
 
 /// ~VARIANT_MASKS_ALL & Header.version is the version number
 pub(crate) const VARIANT_MASKS_ALL: u64 = 0xff00_0000_0000_0000;
@@ -31,7 +32,7 @@ impl ValueKind {
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Symtab {
-    pub names: FxHashMap<u64, String>,
+    pub names: FxHashMap<u64, Arc<str>>,
 }
 
 impl Symtab {
@@ -67,15 +68,15 @@ impl Symtab {
     /// require a matching endian hash. However, this doesn't seem to be represented in any of the
     /// llvm test files so is largely a mystery. Computes a little endian hash unless specified
     /// otherwise.
-    pub fn add_func_name(&mut self, name: String, endianness: Option<Endianness>) {
+    pub fn add_func_name(&mut self, name: Arc<str>, endianness: Option<Endianness>) {
         let hash = match endianness {
-            Some(Endianness::Big) => compute_be_hash(&name),
-            _ => compute_hash(&name),
+            Some(Endianness::Big) => compute_be_hash(name.as_bytes()),
+            _ => compute_hash(name.as_bytes()),
         };
         self.names.insert(hash, name);
     }
 
-    pub fn add_func_name_with_hash(&mut self, name: String, hash: u64) {
+    pub fn add_func_name_with_hash(&mut self, name: Arc<str>, hash: u64) {
         self.names.insert(hash, name);
     }
 
@@ -83,12 +84,12 @@ impl Symtab {
         self.names.contains_key(&hash)
     }
 
-    pub fn get(&self, hash: u64) -> Option<&String> {
-        self.names.get(&hash)
+    pub fn get(&self, hash: u64) -> Option<&str> {
+        self.names.get(&hash).map(AsRef::as_ref)
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = (&u64, &String)> {
-        self.names.iter()
+    pub fn iter(&self) -> impl Iterator<Item = (&u64, &str)> {
+        self.names.iter().map(|(hash, name)| (hash, name.as_ref()))
     }
 }
 
@@ -117,7 +118,7 @@ pub struct InstrumentationProfile {
     pub(crate) fn_entry_only: bool,
     pub(crate) memory_profiling: bool,
     records: Vec<NamedInstrProfRecord>,
-    record_name_lookup: FxHashMap<String, usize>,
+    record_name_lookup: FxHashMap<Arc<str>, usize>,
     pub symtab: Symtab,
 }
 
@@ -185,8 +186,9 @@ impl InstrumentationProfile {
     }
 
     pub fn push_record(&mut self, record: NamedInstrProfRecord) {
-        if let Some(name) = record.name.clone() {
-            self.record_name_lookup.insert(name, self.records.len());
+        if let Some(name) = record.name.as_ref() {
+            self.record_name_lookup
+                .insert(name.clone(), self.records.len());
         }
         self.records.push(record);
     }
@@ -233,11 +235,7 @@ impl InstrumentationProfile {
             let added = if self.symtab.contains(*hash) {
                 // Find the record and merge things. 0 hashed records should have no counters in the
                 // code and otherwise we'll ignore the change that truncated md5 hashes can collide
-                if let Some(rec) = record
-                    .name
-                    .as_ref()
-                    .and_then(|x| self.find_record_by_name_mut(x))
-                {
+                if let Some(rec) = record.name().and_then(|x| self.find_record_by_name_mut(x)) {
                     rec.record.merge(&record.record);
                     true
                 } else {
@@ -245,11 +243,7 @@ impl InstrumentationProfile {
                 }
             } else if let Some(alt_hash) = record.hash {
                 if self.symtab.contains(alt_hash) {
-                    if let Some(rec) = record
-                        .name
-                        .as_ref()
-                        .and_then(|x| self.find_record_by_name_mut(x))
-                    {
+                    if let Some(rec) = record.name().and_then(|x| self.find_record_by_name_mut(x)) {
                         rec.record.merge(&record.record);
                         true
                     } else {
@@ -262,7 +256,7 @@ impl InstrumentationProfile {
                 false
             };
             if !added {
-                self.symtab.names.insert(*hash, record.name_unchecked());
+                self.symtab.names.insert(*hash, record.name_arc_unchecked());
                 self.push_record(record.clone());
             }
         }
@@ -270,9 +264,7 @@ impl InstrumentationProfile {
 
     /// Gets the instrumentation record for the give function
     pub fn get_record(&self, name: &str) -> Option<&NamedInstrProfRecord> {
-        self.records
-            .iter()
-            .find(|x| x.name.as_deref() == Some(name))
+        self.records.iter().find(|x| x.name() == Some(name))
     }
 
     /// Returns true if there are no instrumentation records associated with the profile
@@ -283,7 +275,7 @@ impl InstrumentationProfile {
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub struct NamedInstrProfRecord {
-    pub name: Option<String>,
+    pub name: Option<Arc<str>>,
     pub name_hash: Option<u64>,
     pub hash: Option<u64>,
     pub record: InstrProfRecord,
@@ -317,12 +309,20 @@ impl NamedInstrProfRecord {
         &self.record.counts
     }
 
+    pub fn name(&self) -> Option<&str> {
+        self.name.as_deref()
+    }
+
     pub fn hash_unchecked(&self) -> u64 {
         self.hash.unwrap_or_default()
     }
 
-    pub fn name_unchecked(&self) -> String {
+    pub(crate) fn name_arc_unchecked(&self) -> Arc<str> {
         self.name.clone().unwrap_or_default()
+    }
+
+    pub fn name_unchecked(&self) -> String {
+        self.name().unwrap_or_default().to_string()
     }
 }
 
