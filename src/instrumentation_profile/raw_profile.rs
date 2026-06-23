@@ -248,17 +248,41 @@ where
         } else {
             let mut counts = Vec::<u64>::with_capacity(data.num_counters as usize);
             bytes = &bytes[(counter_offset as usize)..];
-            for _ in 0..(data.num_counters as usize) {
-                let counter = if header.has_byte_coverage() {
+            if header.has_byte_coverage() {
+                if data.num_counters as usize > bytes.len() {
+                    let pos = &bytes[bytes.len()..];
+                    return Err(Err::Failure(VerboseError::from_error_kind(
+                        pos,
+                        ErrorKind::Eof,
+                    )));
+                }
+                for _ in 0..(data.num_counters as usize) {
                     let counter = bytes[0];
                     bytes = &bytes[1..];
-                    (counter == 0) as u64
-                } else {
-                    let (b, counter) = nom_u64(header.endianness)(bytes)?;
-                    bytes = b;
-                    counter
-                };
-                counts.push(counter);
+                    counts.push((counter == 0) as u64);
+                }
+            } else {
+                let counters_bytes = data.num_counters as usize * size_of::<u64>();
+                if counters_bytes > bytes.len() {
+                    let pos = &bytes[bytes.len()..];
+                    return Err(Err::Failure(VerboseError::from_error_kind(
+                        pos,
+                        ErrorKind::Eof,
+                    )));
+                }
+                for _ in 0..(data.num_counters as usize) {
+                    let (count_bytes, remaining) = bytes.split_at(size_of::<u64>());
+                    bytes = remaining;
+                    let count_bytes = count_bytes
+                        .try_into()
+                        .expect("split_at returned exactly eight counter bytes");
+                    let counter = match header.endianness {
+                        Endianness::Little => u64::from_le_bytes(count_bytes),
+                        Endianness::Big => u64::from_be_bytes(count_bytes),
+                        Endianness::Native => u64::from_ne_bytes(count_bytes),
+                    };
+                    counts.push(counter);
+                }
             }
             let record = InstrProfRecord {
                 counts,
@@ -294,8 +318,8 @@ where
 
     fn parse_bytes(mut input: &[u8]) -> ParseResult<'_, InstrumentationProfile> {
         if !input.is_empty() {
-            let mut result = InstrumentationProfile::default();
             let (bytes, header) = Self::parse_header(input)?;
+            let mut result = InstrumentationProfile::with_capacity(header.data_len as usize);
             // LLVM 11 and 12 are version 5. LLVM 13 is version 7
             let version_num = header.version();
             result.version = Some(version_num);
@@ -313,7 +337,7 @@ where
                 )));
             }
             input = &bytes[(header.binary_ids_len as usize)..];
-            let mut data_section = vec![];
+            let mut data_section = Vec::with_capacity(header.data_len as usize);
             for _ in 0..header.data_len {
                 let (bytes, data) = ProfileData::<T>::parse(input, &header)?;
                 debug!("Parsed data section {:?}", data);
@@ -334,7 +358,7 @@ where
                 }
             };
             input = bytes;
-            let mut counters = vec![];
+            let mut counters = Vec::with_capacity(data_section.len());
             let mut counters_delta = header.counters_delta;
 
             // Okay so the counters section looks a bit hairy. So as a brief explanation.
@@ -368,7 +392,7 @@ where
             let (bytes, _) = take(counters_end)(input)?;
             input = bytes;
             let end_length = input.len() - header.names_len as usize;
-            let mut symtab = Symtab::default();
+            let mut symtab = Symtab::with_capacity(data_section.len());
             while input.len() > end_length {
                 let (new_bytes, names) = parse_string_ref(input)?;
                 debug!(

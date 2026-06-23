@@ -4,7 +4,7 @@ use crate::summary::*;
 use anyhow::bail;
 use nom::{
     error::{ContextError, ErrorKind, ParseError},
-    number::{complete::*, Endianness},
+    number::complete::*,
 };
 use rustc_hash::FxHashMap;
 use std::convert::TryFrom;
@@ -191,13 +191,14 @@ impl InstrProfReader for IndexedInstrProf {
         )?;
         debug!("Function hash table: {:?}", table);
         input = bytes;
+        profile.reserve_records(table.0.len());
+        profile.symtab.names.reserve(table.0.len());
         for ((hash, name), v) in &table.0 {
             let name = name.to_string();
+            let name_hash = compute_hash(&name);
             profile
                 .symtab
-                .add_func_name(name.clone(), Some(Endianness::Little));
-
-            let name_hash = compute_hash(&name);
+                .add_func_name_with_hash(name.clone(), name_hash);
             let record = NamedInstrProfRecord {
                 name: Some(name),
                 name_hash: Some(name_hash),

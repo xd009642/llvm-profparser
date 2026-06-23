@@ -63,7 +63,6 @@ fn read_value(
     let mut last_hash = 0;
 
     while input.len() > end_len {
-        let mut counts = vec![];
         let (bytes, hash) = le_u64(input)?;
         last_hash = hash;
         if bytes.len() <= end_len {
@@ -83,6 +82,7 @@ fn read_value(
             )];
             return Err(nom::Err::Failure(VerboseError { errors }));
         }
+        let mut counts = Vec::with_capacity(counts_len as usize);
         for _ in 0..counts_len {
             let (bytes, count) = le_u64(input)?;
             input = bytes;
@@ -136,8 +136,8 @@ fn read_value(
 }
 
 impl HashTable {
-    fn new() -> Self {
-        Self(IndexMap::new())
+    fn with_capacity(capacity: usize) -> Self {
+        Self(IndexMap::with_capacity(capacity))
     }
 
     /// buckets is the data the hash table buckets start at - the start of the `HashTable` in memory.
@@ -155,7 +155,7 @@ impl HashTable {
         debug!("Number of entries: {}", num_entries);
 
         let mut payload = input;
-        let mut result = Self::new();
+        let mut result = Self::with_capacity(num_entries as usize);
         //TODO is this change right?
         while num_entries > 0 {
             let (bytes, entries) = result.parse_bucket(version, payload, num_entries)?;
