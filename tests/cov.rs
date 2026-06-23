@@ -242,7 +242,7 @@ fn check_mapping_consistency() {
             .unwrap();
         assert!(info.cov_map.contains_key(&fun.header.filenames_ref));
         let sym_name = instr.symtab.get(fun.header.name_hash);
-        assert_eq!(sym_name, record.name.as_ref());
+        assert_eq!(sym_name, record.name());
         // record.name record.hash record.counts() + more
 
         // mapping.mapping_info

@@ -15,6 +15,7 @@ use nom::{InputIter, InputLength, Slice};
 use std::convert::TryInto;
 use std::fmt::{Debug, Display};
 use std::mem::size_of;
+use std::sync::Arc;
 use tracing::{debug, error, trace};
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Ord, PartialOrd)]
@@ -392,7 +393,7 @@ where
             let (bytes, _) = take(counters_end)(input)?;
             input = bytes;
             let end_length = input.len() - header.names_len as usize;
-            let mut symtab = Symtab::with_capacity(data_section.len());
+            let mut names_section = Vec::with_capacity(data_section.len());
             while input.len() > end_length {
                 let (new_bytes, names) = parse_string_ref(input)?;
                 debug!(
@@ -403,7 +404,19 @@ where
                 input = new_bytes;
                 for name in names.split(INSTR_PROF_NAME_SEP) {
                     debug!("Symbol name parsed: '{}'", name);
-                    symtab.add_func_name(name.to_string(), Some(header.endianness));
+                    names_section.push(Arc::from(name));
+                }
+            }
+            let mut symtab = Symtab::with_capacity(data_section.len());
+            if names_section.len() == data_section.len() {
+                // Raw profile records carry the name hash as `name_ref`, and LLVM emits the names
+                // section in record order. Reusing that key avoids hashing every function name.
+                for (data, name) in data_section.iter().zip(names_section) {
+                    symtab.add_func_name_with_hash(name, data.name_ref);
+                }
+            } else {
+                for name in names_section {
+                    symtab.add_func_name(name, Some(header.endianness));
                 }
             }
             let padding = get_num_padding_bytes(header.names_len);

@@ -193,15 +193,13 @@ impl InstrProfReader for IndexedInstrProf {
         input = bytes;
         profile.reserve_records(table.0.len());
         profile.symtab.names.reserve(table.0.len());
-        for ((hash, name), v) in &table.0 {
-            let name = name.to_string();
-            let name_hash = compute_hash(&name);
+        for ((hash, name_hash, name), v) in &table.0 {
             profile
                 .symtab
-                .add_func_name_with_hash(name.clone(), name_hash);
+                .add_func_name_with_hash(name.clone(), *name_hash);
             let record = NamedInstrProfRecord {
-                name: Some(name),
-                name_hash: Some(name_hash),
+                name: Some(name.clone()),
+                name_hash: Some(*name_hash),
                 hash: Some(*hash),
                 record: v.clone(),
             };

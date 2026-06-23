@@ -161,7 +161,7 @@ fn try_parse_weighted(input: &str) -> Result<(u64, String), String> {
     }
 }
 
-fn check_function(name: Option<&String>, pattern: Option<&String>) -> bool {
+fn check_function(name: Option<&str>, pattern: Option<&String>) -> bool {
     match pattern {
         Some(pat) => name.map(|x| x.contains(pat)).unwrap_or(false),
         None => false,
@@ -205,14 +205,16 @@ impl ShowCommand {
         let mut below_cutoff_funcs = 0;
         let topn = self.topn.unwrap_or_default();
         for func in profile.records() {
-            if func.name.is_none() || func.hash.is_none() {
+            let Some(name) = func.name() else {
+                continue;
+            };
+            if func.hash.is_none() {
                 continue;
             }
             if is_ir_instr && func.has_cs_flag() != self.showcs {
                 continue;
             }
-            let show =
-                self.all_functions || check_function(func.name.as_ref(), self.function.as_ref());
+            let show = self.all_functions || check_function(Some(name), self.function.as_ref());
 
             if show && self.text {
                 // TODO text format dump
@@ -226,12 +228,7 @@ impl ShowCommand {
             if func_max < self.value_cutoff {
                 below_cutoff_funcs += 1;
                 if self.only_list_below {
-                    println!(
-                        "  {}: (Max = {} Sum = {})",
-                        func.name.as_ref().unwrap(),
-                        func_max,
-                        func_sum
-                    );
+                    println!("  {}: (Max = {} Sum = {})", name, func_max, func_sum);
                     continue;
                 }
             } else if self.only_list_below {
@@ -243,13 +240,13 @@ impl ShowCommand {
                     if top.count < func_max {
                         hotties.pop();
                         hotties.push(HotFn {
-                            name: func.name.as_ref().unwrap().to_string(),
+                            name: name.to_string(),
                             count: func_max,
                         });
                     }
                 } else {
                     hotties.push(HotFn {
-                        name: func.name.as_ref().unwrap().to_string(),
+                        name: name.to_string(),
                         count: func_max,
                     });
                 }
@@ -259,7 +256,7 @@ impl ShowCommand {
                     println!("Counters:");
                 }
                 shown_funcs += 1;
-                println!("  {}:", func.name.as_ref().unwrap());
+                println!("  {}:", name);
                 println!("    Hash: {:#018x}", func.hash.unwrap());
                 println!("    Counters: {}", func.counts().len());
                 if !is_ir_instr {

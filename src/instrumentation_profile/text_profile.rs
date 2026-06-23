@@ -12,6 +12,7 @@ use nom::multi::*;
 use nom::sequence::*;
 use nom::*;
 use std::io::Read;
+use std::sync::Arc;
 
 const IR_TAG: &[u8] = b"ir";
 const FE_TAG: &[u8] = b"fe";
@@ -234,10 +235,10 @@ impl InstrProfReader for TextInstrProf {
                 counts: counters,
                 data,
             };
-            let name = std::str::from_utf8(name).map(|x| x.to_string()).ok();
+            let name = std::str::from_utf8(name).map(Arc::<str>::from).ok();
             result.push_record(NamedInstrProfRecord {
                 name: name.clone(),
-                name_hash: name.as_ref().map(compute_hash),
+                name_hash: name.as_ref().map(|name| compute_hash(name.as_bytes())),
                 hash: Some(hash),
                 record,
             });
@@ -374,11 +375,11 @@ mod tests {
         assert_eq!(report.get_level(), InstrumentationLevel::FrontEnd);
         assert_eq!(report.records().len(), 1);
         assert_eq!(report.symtab.len(), 1);
-        assert_eq!(report.symtab.names.get(&0).unwrap(), "main");
+        assert_eq!(report.symtab.get(0), Some("main"));
 
         let rec = &report.records()[0];
 
-        assert_eq!(rec.name, Some("main".to_string()));
+        assert_eq!(rec.name(), Some("main"));
         assert_eq!(rec.hash, Some(0));
         assert_eq!(rec.record.counts, vec![100]);
         assert_eq!(rec.record.data, None);
