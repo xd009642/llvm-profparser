@@ -303,15 +303,15 @@ fn parse_coverage_mapping<'data, R: ReadRef<'data>>(
         while !data.is_empty() {
             let data_len = data.len();
             // Read the number of affixed function records (now just 0 as not in this header)
-            debug_assert_eq!(endian.read_i32_bytes(data[0..4].try_into().unwrap()), 0);
-            let filename_data_len = endian.read_i32_bytes(data[4..8].try_into().unwrap());
+            debug_assert_eq!(endian.read_i32(data[0..4].try_into().unwrap()), 0);
+            let filename_data_len = endian.read_i32(data[4..8].try_into().unwrap());
             // Read the length of the affixed string that contains encoded coverage mapping data (now 0
             // as not in this header)
-            debug_assert_eq!(endian.read_i32_bytes(data[8..12].try_into().unwrap()), 0);
-            let _format_version = endian.read_i32_bytes(data[12..16].try_into().unwrap());
+            debug_assert_eq!(endian.read_i32(data[8..12].try_into().unwrap()), 0);
+            let _format_version = endian.read_i32(data[12..16].try_into().unwrap());
 
             let hash = md5::compute(&data[16..(filename_data_len as usize + 16)]);
-            let hash = endian.read_u64_bytes(hash.0[..8].try_into().unwrap());
+            let hash = endian.read_u64(hash.0[..8].try_into().unwrap());
 
             //let bytes = &data[16..(16 + filename_data_len as usize)];
             let bytes = &data[16..];
@@ -351,10 +351,10 @@ fn parse_coverage_functions<'data, R: ReadRef<'data>>(
         let mut res = vec![];
         let section_len = bytes.len();
         while !bytes.is_empty() {
-            let name_hash = endian.read_u64_bytes(bytes[0..8].try_into().unwrap());
-            let data_len = endian.read_u32_bytes(bytes[8..12].try_into().unwrap());
-            let fn_hash = endian.read_u64_bytes(bytes[12..20].try_into().unwrap());
-            let filenames_ref = endian.read_u64_bytes(bytes[20..28].try_into().unwrap());
+            let name_hash = endian.read_u64(bytes[0..8].try_into().unwrap());
+            let data_len = endian.read_u32(bytes[8..12].try_into().unwrap());
+            let fn_hash = endian.read_u64(bytes[12..20].try_into().unwrap());
+            let filenames_ref = endian.read_u64(bytes[20..28].try_into().unwrap());
             let header = FunctionRecordHeader {
                 name_hash,
                 data_len,
@@ -546,14 +546,14 @@ fn parse_profile_data<'data, R: ReadRef<'data>>(
         let mut res = vec![];
         while !bytes.is_empty() {
             // bytes.len() >= 24 {
-            let name_md5 = endian.read_u64_bytes(bytes[..8].try_into().unwrap());
-            let structural_hash = endian.read_u64_bytes(bytes[8..16].try_into().unwrap());
+            let name_md5 = endian.read_u64(bytes[..8].try_into().unwrap());
+            let structural_hash = endian.read_u64(bytes[8..16].try_into().unwrap());
 
-            let _counter_ptr = endian.read_u64_bytes(bytes[16..24].try_into().unwrap());
+            let _counter_ptr = endian.read_u64(bytes[16..24].try_into().unwrap());
             let counters_location = 24 + 16;
             if bytes.len() <= counters_location {
                 bytes = &bytes[counters_location..];
-                let counters_len = endian.read_u32_bytes(bytes[..4].try_into().unwrap());
+                let counters_len = endian.read_u32(bytes[..4].try_into().unwrap());
                 // TODO Might need to get the counter offset and get the list of counters from this?
                 // And potentially check against the maximum number of counters just to make sure that
                 // it's not being exceeded?
@@ -590,7 +590,7 @@ fn parse_profile_counters<'data, R: ReadRef<'data>>(
             if data.len() < (i + 8) {
                 break;
             }
-            result.push(endian.read_u64_bytes(data[i..(i + 8)].try_into().unwrap()));
+            result.push(endian.read_u64(data[i..(i + 8)].try_into().unwrap()));
         }
         Ok(result)
     } else {
