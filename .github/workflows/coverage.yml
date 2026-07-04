@@ -23,4 +23,4 @@ jobs:
         run: |
           cargo install cargo-binutils@0.3.6
           cargo install cargo-tarpaulin
-          cargo tarpaulin --all-features --force-clean --exclude-files tests/data/* benches/* --follow-exec --coveralls ${{ secrets.CODECOV_TOKEN }} --engine llvm
+          cargo tarpaulin --force-clean --exclude-files tests/data/* benches/* --follow-exec --coveralls ${{ secrets.CODECOV_TOKEN }} --engine llvm
