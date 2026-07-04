@@ -1,6 +1,6 @@
 [package]
 name = "llvm_profparser"
-version = "0.11.0"
+version = "0.12.0"
 authors = ["xd009642 <danielmckenna93@gmail.com>"]
 description = "Parsing and interpretation of llvm coverage profiles and generated data"
 repository = "https://github.com/xd009642/llvm-profparser"
@@ -15,6 +15,7 @@ rust-version = "1.80.0"
 [features]
 default = ["cli", "__llvm_20"]
 cli = ["clap", "tracing-subscriber"]
+wasm = ["object/wasm"]
 
 # for testing
 # to run all tests, run `cargo test --all-features`.
@@ -40,7 +41,7 @@ indexmap = "~1.8"
 leb128 = "0.2.4"
 md5 = "0.8"
 nom = "7.0.0"
-object = "0.26.0"
+object = "0.39"
 rustc-hash = "2.1"
 clap = { version = "4", features = ["derive"], optional = true }
 thiserror = "1.0.30"

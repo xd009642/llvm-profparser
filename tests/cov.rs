@@ -212,6 +212,34 @@ fn check_matches() {
     }
 }
 
+/// WebAssembly objects store LLVM coverage data in custom sections. The parser should read those
+/// sections through the object crate and map the resulting profile counts back to Rust source
+/// lines.
+#[test]
+#[cfg(feature = "wasm")]
+fn check_wasm_bindgen_mapping() {
+    let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/cov/wasm-bindgen");
+    let instr = parse(dir.join("wasm-tarpaulin-check.profraw")).expect("wasm profraw should parse");
+    let object_files = &[dir.join("wasm_tarpaulin_check.wasm")];
+    let mapping = CoverageMapping::new(object_files, &instr, false)
+        .expect("wasm coverage mapping should construct");
+    let report = mapping
+        .generate_report()
+        .expect("wasm coverage report should generate");
+
+    let (_, result) = report
+        .files
+        .iter()
+        .find(|(path, _)| path.ends_with("wasm-tarpaulin-check/src/lib.rs"))
+        .expect("fixture source file should be present in wasm coverage report");
+
+    assert_eq!(result.hits_for_line(1), Some(1));
+    assert_eq!(result.hits_for_line(2), Some(1));
+    assert_eq!(result.hits_for_line(5), Some(0));
+    assert_eq!(result.hits_for_line(6), Some(0));
+    assert_eq!(result.hits_for_line(14), Some(1));
+}
+
 #[test]
 #[ignore]
 fn check_stable_vec() {
