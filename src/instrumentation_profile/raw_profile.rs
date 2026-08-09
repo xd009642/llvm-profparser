@@ -71,6 +71,10 @@ pub struct Header {
     pub bitmap_delta: u64,
     pub num_vtables: u64,
     pub vnames_size: u64,
+    /// Raw profile version 11 (LLVM 23) added uniform-counter fields.
+    pub num_uniform_counters: u64,
+    pub padding_bytes_after_uniform_counters: u64,
+    pub uniform_counters_delta: u64,
 }
 
 impl Header {
@@ -119,12 +123,16 @@ pub struct ProfileData<T> {
     name_ref: u64,
     func_hash: u64,
     counter_ptr: T,
+    /// Raw profile version 11 (LLVM 23).
+    uniform_counter_ptr: Option<T>,
     bitmap_ptr: Option<T>,
     function_addr: T,
     values_ptr_expr: T,
     num_counters: u32,
     /// This might just be two values?
     num_value_sites: [u16; ValueKind::MemOpSize as usize + 1],
+    /// Raw profile version 11 (LLVM 23).
+    offload_device_wave_size: u16,
     num_bitmap_bytes: u32,
 }
 
@@ -232,7 +240,7 @@ where
             || counter_offset > max_counters
             || counter_offset + data.num_counters as i64 > max_counters
         {
-            error!("consistency check for reading counts failed");
+        error!("consistency check for reading counts failed");
             //Err(Err::Failure(Error::new(bytes, ErrorKind::Satisfy))) TODO
             Err(Err::Failure(VerboseError::from_error_kind(
                 bytes,
@@ -343,8 +351,13 @@ where
                 let (bytes, data) = ProfileData::<T>::parse(input, &header)?;
                 debug!("Parsed data section {:?}", data);
                 data_section.push(data);
-                if version_num > 8 {
-                    let (bytes, v) = take(4usize)(bytes)?; // TODO WHAT AM I MISSING HERE?
+                // Struct tail padding. In v9/v10 ProfileData ends on a 4-byte field at offset 60,
+                // so the compiler pads to 64. In v11 (LLVM 23) OffloadDeviceWaveSize shifts
+                // NumBitmapBytes to offset 68, the struct ends at 72 which is already 8-aligned,
+                // and the padding moves INSIDE the struct (2 bytes, handled in ProfileData::parse).
+                // Taking 4 here as well would over-consume and desynchronise every later record.
+                if version_num > 8 && version_num < 11 {
+                    let (bytes, v) = take(4usize)(bytes)?;
                     debug!("Got those padding? bytes {:?}", v);
                     input = bytes;
                 } else {
@@ -478,6 +491,18 @@ where
                     (bytes, 0, 0)
                 };
 
+            // Raw profile version 11 (LLVM 23) inserts three uint64 fields here, before
+            // NamesSize. Without reading them every subsequent field is off by 24 bytes.
+            let (bytes, num_uniform_counters, padding_bytes_after_uniform_counters, uniform_counters_delta) =
+                if (version & !VARIANT_MASKS_ALL) >= 11 {
+                    let (bytes, num_uniform_counters) = nom_u64(endianness)(bytes)?;
+                    let (bytes, padding_after) = nom_u64(endianness)(bytes)?;
+                    let (bytes, uniform_delta) = nom_u64(endianness)(bytes)?;
+                    (bytes, num_uniform_counters, padding_after, uniform_delta)
+                } else {
+                    (bytes, 0, 0, 0)
+                };
+
             let (bytes, names_len) = nom_u64(endianness)(bytes)?;
             let (bytes, counters_delta) = nom_u64(endianness)(bytes)?;
 
@@ -517,6 +542,9 @@ where
                 bitmap_delta,
                 num_vtables,
                 vnames_size,
+                num_uniform_counters,
+                padding_bytes_after_uniform_counters,
+                uniform_counters_delta,
             };
             debug!("Read header {:?}", result);
             Ok((bytes, result))
@@ -554,6 +582,13 @@ where
         let (bytes, name_ref) = nom_u64(endianness)(bytes)?;
         let (bytes, func_hash) = nom_u64(endianness)(bytes)?;
         let (bytes, counter_ptr) = parse(bytes)?;
+        // v11 (LLVM 23) inserts UniformCounterPtr between CounterPtr and BitmapPtr.
+        let (bytes, uniform_counter_ptr) = if header.version() >= 11 {
+            let (bytes, p) = parse(bytes)?;
+            (bytes, Some(p))
+        } else {
+            (bytes, None)
+        };
         let (bytes, bitmap_ptr) = if header.version() > 8 {
             let (bytes, bitmap_ptr) = parse(bytes)?;
             (bytes, Some(bitmap_ptr))
@@ -565,6 +600,15 @@ where
         let (bytes, num_counters) = nom_u32(endianness)(bytes)?;
         let (bytes, value_0) = nom_u16(endianness)(bytes)?;
         let (bytes, value_1) = nom_u16(endianness)(bytes)?;
+        // v11 (LLVM 23) adds OffloadDeviceWaveSize after NumValueSites[]. In C that leaves the
+        // following uint32 misaligned, so the compiler inserts 2 bytes of padding; skip both.
+        let (bytes, offload_device_wave_size) = if header.version() >= 11 {
+            let (bytes, w) = nom_u16(endianness)(bytes)?;
+            let (bytes, _pad) = nom_u16(endianness)(bytes)?;
+            (bytes, w)
+        } else {
+            (bytes, 0)
+        };
         let (bytes, num_bitmap_bytes) = if header.version() > 8 {
             nom_u32(endianness)(bytes)?
         } else {
@@ -577,11 +621,13 @@ where
                 name_ref,
                 func_hash,
                 counter_ptr,
+                uniform_counter_ptr,
                 bitmap_ptr,
                 function_addr,
                 values_ptr_expr,
                 num_counters,
                 num_value_sites: [value_0, value_1],
+                offload_device_wave_size,
                 num_bitmap_bytes,
             },
         ))
