@@ -240,7 +240,7 @@ where
             || counter_offset > max_counters
             || counter_offset + data.num_counters as i64 > max_counters
         {
-        error!("consistency check for reading counts failed");
+            error!("consistency check for reading counts failed");
             //Err(Err::Failure(Error::new(bytes, ErrorKind::Satisfy))) TODO
             Err(Err::Failure(VerboseError::from_error_kind(
                 bytes,
@@ -405,6 +405,36 @@ where
             debug!("Applying padding bytes after counters");
             let (bytes, _) = take(counters_end)(input)?;
             input = bytes;
+
+            // compiler-rt writes the body as: data, PaddingBytesBeforeCounters, counters,
+            // PaddingBytesAfterCounters, bitmap, PaddingBytesAfterBitmapBytes, uniform counters,
+            // PaddingBytesAfterUniformCounters, names (see the IOVec list in
+            // lprofWriteDataImpl, compiler-rt/lib/profile/InstrProfilingWriter.c).
+            //
+            // The take above stops at the end of PaddingBytesAfterCounters, so everything
+            // between there and the names section has to be stepped over explicitly.
+            // Otherwise the names parser starts reading inside the bitmap or the uniform
+            // counter data and produces garbage symbol names.
+            //
+            // Both sections are zero-sized in the common case, which is why this went
+            // unnoticed: the bitmap is only populated for MC/DC instrumentation, and
+            // NumUniformCounters is 0 unless the uniform counter section is emitted. The
+            // arithmetic below is a no-op in that case.
+            let uniform_counters_size =
+                (header.num_uniform_counters as usize).saturating_mul(std::mem::size_of::<u64>());
+            let pre_names_sections = (header.num_bitmap_bytes as usize)
+                .saturating_add(header.padding_bytes_after_bitmap_bytes as usize)
+                .saturating_add(uniform_counters_size)
+                .saturating_add(header.padding_bytes_after_uniform_counters as usize);
+            if pre_names_sections > 0 {
+                debug!(
+                    "Skipping {} bytes of bitmap and uniform counter data before names",
+                    pre_names_sections
+                );
+                let (bytes, _) = take(pre_names_sections)(input)?;
+                input = bytes;
+            }
+
             let end_length = input.len() - header.names_len as usize;
             let mut names_section = Vec::with_capacity(data_section.len());
             while input.len() > end_length {
@@ -493,15 +523,19 @@ where
 
             // Raw profile version 11 (LLVM 23) inserts three uint64 fields here, before
             // NamesSize. Without reading them every subsequent field is off by 24 bytes.
-            let (bytes, num_uniform_counters, padding_bytes_after_uniform_counters, uniform_counters_delta) =
-                if (version & !VARIANT_MASKS_ALL) >= 11 {
-                    let (bytes, num_uniform_counters) = nom_u64(endianness)(bytes)?;
-                    let (bytes, padding_after) = nom_u64(endianness)(bytes)?;
-                    let (bytes, uniform_delta) = nom_u64(endianness)(bytes)?;
-                    (bytes, num_uniform_counters, padding_after, uniform_delta)
-                } else {
-                    (bytes, 0, 0, 0)
-                };
+            let (
+                bytes,
+                num_uniform_counters,
+                padding_bytes_after_uniform_counters,
+                uniform_counters_delta,
+            ) = if (version & !VARIANT_MASKS_ALL) >= 11 {
+                let (bytes, num_uniform_counters) = nom_u64(endianness)(bytes)?;
+                let (bytes, padding_after) = nom_u64(endianness)(bytes)?;
+                let (bytes, uniform_delta) = nom_u64(endianness)(bytes)?;
+                (bytes, num_uniform_counters, padding_after, uniform_delta)
+            } else {
+                (bytes, 0, 0, 0)
+            };
 
             let (bytes, names_len) = nom_u64(endianness)(bytes)?;
             let (bytes, counters_delta) = nom_u64(endianness)(bytes)?;
