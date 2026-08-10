@@ -85,6 +85,8 @@ static SUPPORTED_LLVM_VERSIONS: LazyLock<HashMap<u8, &str>> = LazyLock::new(|| {
         (21, "1.91"),
         #[cfg(feature = "__llvm_22")]
         (22, "nightly-2026-02-15"),
+        #[cfg(feature = "__llvm_23")]
+        (23, "nightly-2026-08-08"),
     ]);
 
     // Install all the versions we care about.
@@ -108,7 +110,7 @@ static SUPPORTED_LLVM_VERSIONS: LazyLock<HashMap<u8, &str>> = LazyLock::new(|| {
     map
 });
 
-static LATEST_SUPPORTED_VERSION: u8 = 22;
+static LATEST_SUPPORTED_VERSION: u8 = 23;
 
 #[test]
 // this test is 'heavy', since it downloads a new toolchain each day.
@@ -504,4 +506,40 @@ fn hash_table_regression_check() {
     // We've not locked this to version, but it's enough to parse it and making sure it parses
     // correctly to prevent a regression.
     parse(&ferrocene).unwrap();
+}
+
+// Raw profile version 11 places the uniform counter section between the bitmap and the names,
+// so a parser that jumps straight from the counters to the names starts reading names from
+// inside the uniform counter data. LLVM only emits that section in some configurations, so a
+// profile captured from a normal build has NumUniformCounters == 0 and cannot catch this.
+//
+// This fixture is a real v11 profraw (rustc 1.99.0-nightly 771916f90, LLVM 23.1.0) with two
+// uniform counters spliced in and the three v11 header fields set to match, following the
+// layout compiler-rt writes in lprofWriteDataImpl. Before the section was skipped this input
+// panicked in util.rs with "range end index 197877615 out of range for slice of length 90",
+// because the name length prefix was read out of the uniform counter payload.
+#[test]
+fn v11_uniform_counter_section_is_skipped() {
+    let raw = data_root_dir()
+        .join("misc")
+        .join("v11_uniform_counters.profraw");
+
+    let profile = parse(&raw).unwrap();
+
+    let names = profile
+        .symtab
+        .iter()
+        .map(|(_, name)| name.to_string())
+        .collect::<HashSet<_>>();
+
+    // Both symbols sit after the uniform counter section, so any drift in the skip corrupts
+    // them rather than merely shifting them.
+    assert!(
+        names.contains("_RNvCs9Ov4RGoaFQp_8v11probe7covered"),
+        "expected instrumented function missing, got {names:?}"
+    );
+    assert!(
+        names.contains("_RNvNtCs9Ov4RGoaFQp_8v11probe5testss_1t"),
+        "expected test function missing, got {names:?}"
+    );
 }
