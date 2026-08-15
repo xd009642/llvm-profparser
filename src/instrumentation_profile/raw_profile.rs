@@ -351,12 +351,11 @@ where
                 let (bytes, data) = ProfileData::<T>::parse(input, &header)?;
                 debug!("Parsed data section {:?}", data);
                 data_section.push(data);
-                // Struct tail padding. In v9/v10 ProfileData ends on a 4-byte field at offset 60,
-                // so the compiler pads to 64. In v11 (LLVM 23) OffloadDeviceWaveSize shifts
-                // NumBitmapBytes to offset 68, the struct ends at 72 which is already 8-aligned,
-                // and the padding moves INSIDE the struct (2 bytes, handled in ProfileData::parse).
-                // Taking 4 here as well would over-consume and desynchronise every later record.
-                if version_num > 8 && version_num < 11 {
+                // ProfileData contains uint64 fields, so its alignment is 8 bytes even when its
+                // pointer fields are 32-bit. V11's 64-bit layout ends at 72 bytes, but its 32-bit
+                // layout ends at 52 bytes and therefore retains 4 bytes of tail padding. Missing
+                // that padding desynchronises every record after the first in wasm profiles.
+                if version_num > 8 && (version_num < 11 || size_of::<T>() == size_of::<u32>()) {
                     let (bytes, v) = take(4usize)(bytes)?;
                     debug!("Got those padding? bytes {:?}", v);
                     input = bytes;
