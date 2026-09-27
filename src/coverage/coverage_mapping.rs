@@ -151,12 +151,28 @@ impl<'a> CoverageMapping<'a> {
 
         for result in self.mapping_info_iter() {
             let info = result?;
+            // Many functions share a filenames_ref, and in a large binary most
+            // functions come from dependencies the predicate rejects. Resolve and
+            // filter each path list once per object, and only then look up the
+            // counters, so a rejected function costs one hash lookup instead of a
+            // path-list allocation plus a profile-record search.
+            let mut accepted: FxHashMap<u64, Option<Vec<PathBuf>>> = FxHashMap::default();
             for func in &info.cov_fun {
+                let paths = accepted
+                    .entry(func.header.filenames_ref)
+                    .or_insert_with(|| {
+                        let paths = info.get_files_from_id(func.header.filenames_ref);
+                        if paths.is_empty() || !predicate(&paths) {
+                            None
+                        } else {
+                            Some(paths)
+                        }
+                    });
+                let paths = match paths {
+                    Some(paths) => &*paths,
+                    None => continue,
+                };
                 let base_region_ids = self.get_simple_counters(func);
-                let paths = info.get_files_from_id(func.header.filenames_ref);
-                if paths.is_empty() || !predicate(&paths) {
-                    continue;
-                }
 
                 let mut region_ids = base_region_ids.clone();
 
