@@ -63,7 +63,7 @@ fn llvm_tool(sysroot: &Path, host: &str, name: &str) -> PathBuf {
         .join("rustlib")
         .join(host)
         .join("bin")
-        .join(name);
+        .join(format!("{name}{}", std::env::consts::EXE_SUFFIX));
     assert!(
         path.is_file(),
         "couldn't find `{}` at {:?}; install it with `rustup component add llvm-tools`",
@@ -84,7 +84,7 @@ fn monomorphized_functions_get_scoped_coverage() {
     std::fs::create_dir_all(temp_dir).unwrap();
 
     let src = temp_dir.join("sample.rs");
-    let bin = temp_dir.join("prog");
+    let bin = temp_dir.join(format!("prog{}", std::env::consts::EXE_SUFFIX));
     let profraw = temp_dir.join("prog.profraw");
     let profdata = temp_dir.join("prog.profdata");
 
