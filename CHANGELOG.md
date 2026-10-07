@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.0]
+### Changed
+- Track compiled function names - different monomorphisations of functions get
+different names and this allows us to track the coverage of each monomorphisation
+
+### Fixed
+- Handling of zero sentinels in windows COFF object files
+
 ## [0.14.0]
 ### Changed
 - `generate_subreport` applies the path predicate before looking up a
