@@ -469,6 +469,12 @@ fn parse_profile_names<'data, R: ReadRef<'data>>(
     };
     let mut result = FxHashMap::default();
     while !input.is_empty() {
+        // COFF sections include zero-valued sentinels
+        // and may have padding between chunks.
+        if input[0] == 0 {
+            input = &input[1..];
+            continue;
+        }
         let Ok((rest, names)) = parse_string_ref::<NomError<_>>(input) else {
             break;
         };
