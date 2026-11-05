@@ -701,7 +701,7 @@ fn parse_counter(input: u64, exprs: &mut Vec<Expression>) -> Counter {
 }
 
 #[cfg(test)]
-mod structural_hash_tests {
+mod tests {
     use super::*;
     use crate::instrumentation_profile::types::{
         compute_hash, InstrProfRecord, NamedInstrProfRecord,

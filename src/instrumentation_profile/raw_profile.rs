@@ -667,7 +667,7 @@ where
 }
 
 #[cfg(test)]
-mod duplicate_records_tests {
+mod tests {
     use super::*;
 
     /// Duplicate records in the first (and only) raw profile must already be merged.

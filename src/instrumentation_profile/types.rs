@@ -595,11 +595,6 @@ mod tests {
             ]]
         );
     }
-}
-
-#[cfg(test)]
-mod duplicate_records_tests {
-    use super::*;
 
     fn record(hash: u64, counts: &[u64]) -> NamedInstrProfRecord {
         NamedInstrProfRecord {
