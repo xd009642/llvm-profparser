@@ -119,6 +119,7 @@ pub struct InstrumentationProfile {
     pub(crate) memory_profiling: bool,
     records: Vec<NamedInstrProfRecord>,
     record_name_lookup: FxHashMap<Arc<str>, usize>,
+    record_key_lookup: FxHashMap<(Arc<str>, Option<u64>), usize>,
     pub symtab: Symtab,
 }
 
@@ -139,6 +140,7 @@ impl InstrumentationProfile {
         Self {
             records: Vec::with_capacity(capacity),
             record_name_lookup,
+            record_key_lookup: FxHashMap::with_capacity_and_hasher(capacity, Default::default()),
             symtab: Symtab::with_capacity(capacity),
             ..Default::default()
         }
@@ -147,6 +149,7 @@ impl InstrumentationProfile {
     pub(crate) fn reserve_records(&mut self, additional: usize) {
         self.records.reserve(additional);
         self.record_name_lookup.reserve(additional);
+        self.record_key_lookup.reserve(additional);
     }
 
     pub fn version(&self) -> Option<u64> {
@@ -187,14 +190,31 @@ impl InstrumentationProfile {
 
     pub fn push_record(&mut self, record: NamedInstrProfRecord) {
         if let Some(name) = record.name.as_ref() {
+            self.record_key_lookup
+                .insert((name.clone(), record.hash), self.records.len());
             self.record_name_lookup
                 .insert(name.clone(), self.records.len());
         }
         self.records.push(record);
     }
 
+    /// Finds the most recently contributed structural version of a named function.
+    /// Coverage mappings merge contributions and select the matching structural hash.
     pub fn find_record_by_name(&self, name: &str) -> Option<&NamedInstrProfRecord> {
         self.record_name_lookup.get(name).map(|x| &self.records[*x])
+    }
+
+    /// Finds the record matching both the name hash and structural function hash.
+    /// Functions with different structural hashes have distinct counter layouts.
+    pub(crate) fn find_record_by_hashes(
+        &self,
+        name_hash: u64,
+        function_hash: u64,
+    ) -> Option<&NamedInstrProfRecord> {
+        let name = self.symtab.names.get(&name_hash)?;
+        self.record_key_lookup
+            .get(&(name.clone(), Some(function_hash)))
+            .map(|index| &self.records[*index])
     }
 
     pub fn find_record_by_hash(&self, hash: u64) -> Option<&NamedInstrProfRecord> {
@@ -231,35 +251,71 @@ impl InstrumentationProfile {
     }
 
     pub fn merge_record(&mut self, record: &NamedInstrProfRecord) {
-        if let Some(hash) = record.name_hash.as_ref() {
-            let added = if self.symtab.contains(*hash) {
-                // Find the record and merge things. 0 hashed records should have no counters in the
-                // code and otherwise we'll ignore the change that truncated md5 hashes can collide
-                if let Some(rec) = record.name().and_then(|x| self.find_record_by_name_mut(x)) {
-                    rec.record.merge(&record.record);
-                    true
-                } else {
-                    false
+        if let Some(hash) = record.name_hash {
+            self.symtab.names.insert(hash, record.name_arc_unchecked());
+            if let Some(name) = record.name.as_ref() {
+                if let Some(index) = self.record_key_lookup.get(&(name.clone(), record.hash)) {
+                    self.records[*index].record.merge(&record.record);
+                    self.record_name_lookup.insert(name.clone(), *index);
+                    return;
                 }
-            } else if let Some(alt_hash) = record.hash {
-                if self.symtab.contains(alt_hash) {
-                    if let Some(rec) = record.name().and_then(|x| self.find_record_by_name_mut(x)) {
-                        rec.record.merge(&record.record);
-                        true
-                    } else {
-                        false
-                    }
-                } else {
-                    false
+            }
+            self.push_record(record.clone());
+        }
+    }
+
+    pub(crate) fn has_duplicate_records(&self) -> bool {
+        self.record_key_lookup.len()
+            < self
+                .records
+                .iter()
+                .filter(|record| record.name.is_some())
+                .count()
+    }
+
+    pub(crate) fn try_merge(&mut self, other: &Self) -> std::io::Result<()> {
+        if self.version.is_none() && other.version.is_some() {
+            self.version = other.version;
+        }
+        for record in &other.records {
+            self.try_merge_record(record)?;
+        }
+        Ok(())
+    }
+
+    pub(crate) fn try_merge_record(
+        &mut self,
+        record: &NamedInstrProfRecord,
+    ) -> std::io::Result<()> {
+        if let Some(name) = record.name.as_ref() {
+            if let Some(index) = self.record_key_lookup.get(&(name.clone(), record.hash)) {
+                if self.records[*index].record.counts.len() != record.record.counts.len() {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        format!("counter count mismatch for function {name}"),
+                    ));
                 }
-            } else {
-                false
-            };
-            if !added {
-                self.symtab.names.insert(*hash, record.name_arc_unchecked());
-                self.push_record(record.clone());
             }
         }
+        self.merge_record(record);
+        Ok(())
+    }
+
+    /// Parsing retains individual records for `show`; merging and coverage need
+    /// one summed contribution per function identity, including the first file.
+    pub(crate) fn normalize(mut self) -> std::io::Result<Self> {
+        let records = std::mem::take(&mut self.records);
+        self.record_name_lookup.clear();
+        self.record_key_lookup.clear();
+        self.records.reserve(records.len());
+        for record in records {
+            if record.name_hash.is_some() {
+                self.try_merge_record(&record)?;
+            } else {
+                self.push_record(record);
+            }
+        }
+        Ok(self)
     }
 
     /// Gets the instrumentation record for the give function
@@ -538,5 +594,115 @@ mod tests {
                 },
             ]]
         );
+    }
+
+    fn record(hash: u64, counts: &[u64]) -> NamedInstrProfRecord {
+        NamedInstrProfRecord {
+            name: Some(Arc::from("function")),
+            name_hash: Some(compute_hash("function")),
+            hash: Some(hash),
+            record: InstrProfRecord {
+                counts: counts.to_vec(),
+                data: None,
+            },
+        }
+    }
+
+    /// Normalization combines duplicate contributions independent of ordering.
+    #[test]
+    fn duplicate_records_sum_counters_in_either_order() {
+        let records = [record(7, &[2, 0]), record(7, &[0, 3])];
+        for reverse in [false, true] {
+            let mut profile = InstrumentationProfile::default();
+            for index in if reverse { [1, 0] } else { [0, 1] } {
+                profile.push_record(records[index].clone());
+            }
+            let profile = profile.normalize().expect("matching duplicate layouts");
+            assert_eq!(profile.records().len(), 1);
+            assert_eq!(
+                profile
+                    .find_record_by_name("function")
+                    .expect("merged function")
+                    .record
+                    .counts,
+                [2, 3]
+            );
+        }
+    }
+
+    /// Merging profiles must preserve different versions and merge only matching layouts.
+    #[test]
+    fn duplicate_records_preserve_structural_versions() {
+        let mut profile = InstrumentationProfile::default();
+        profile.merge_record(&record(7, &[2, 0]));
+        profile.merge_record(&record(8, &[5]));
+        let mut other = InstrumentationProfile::default();
+        other.merge_record(&record(7, &[0, 3]));
+        profile.merge(&other);
+        let hash = compute_hash("function");
+        assert_eq!(profile.records().len(), 2);
+        assert_eq!(
+            profile
+                .find_record_by_hashes(hash, 7)
+                .expect("first layout")
+                .record
+                .counts,
+            [2, 3]
+        );
+        assert_eq!(
+            profile
+                .find_record_by_hashes(hash, 8)
+                .expect("second layout")
+                .record
+                .counts,
+            [5]
+        );
+        assert!(profile.find_record_by_hashes(hash, 9).is_none());
+        assert_eq!(
+            profile
+                .find_record_by_name("function")
+                .expect("legacy name lookup")
+                .hash,
+            Some(7)
+        );
+    }
+    /// LLVM's counter-mismatch fixture is displayable but cannot be merged safely.
+    #[test]
+    fn duplicate_records_reject_incompatible_counter_layouts() {
+        let mut profile = InstrumentationProfile::new(Some(7), false, false, false);
+        profile.push_record(record(7, &[1]));
+        profile.push_record(record(7, &[2, 3]));
+        assert_eq!(
+            profile
+                .clone()
+                .normalize()
+                .expect_err("mismatched counters")
+                .kind(),
+            std::io::ErrorKind::InvalidData
+        );
+        let error = crate::CoverageMapping::new(&[], &profile, false)
+            .expect_err("mapping must reject mismatched counters");
+        assert!(error.to_string().contains("counter count mismatch"));
+        let fixture = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/data/profdata/llvm-15/counter-mismatch-1.proftext");
+        assert_eq!(
+            crate::merge_profiles(&[fixture])
+                .expect_err("invalid LLVM merge fixture")
+                .kind(),
+            std::io::ErrorKind::InvalidData
+        );
+    }
+    /// Text profiles omit the raw format version, which a later raw input supplies.
+    #[test]
+    fn checked_merge_retains_version_from_later_profile() {
+        for version in [7, 8] {
+            let mut text = InstrumentationProfile::default();
+            text.merge_record(&record(7, &[1]));
+            let mut raw = InstrumentationProfile::new(Some(version), false, false, false);
+            raw.merge_record(&record(7, &[2]));
+            text.try_merge(&raw).expect("matching counter layouts");
+            assert_eq!(text.version(), Some(version));
+            assert_eq!(text.records()[0].record.counts, [3]);
+        }
     }
 }

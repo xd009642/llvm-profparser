@@ -30,10 +30,10 @@ where
         return Ok(InstrumentationProfile::default());
     };
 
-    let mut base = parse(first)?;
+    let mut base = parse(first)?.normalize()?;
     for input in rest {
         let profile = parse(input)?;
-        base.merge(&profile);
+        base.try_merge(&profile)?;
     }
     Ok(base)
 }
