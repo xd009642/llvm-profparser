@@ -5,6 +5,7 @@ use crate::util::*;
 use anyhow::{bail, Result};
 use nom::error::Error as NomError;
 use object::{Endian, Endianness, Object, ObjectSection, ReadCache, ReadRef, Section};
+use std::borrow::Cow;
 use std::convert::TryInto;
 use std::error::Error;
 use std::fmt;
@@ -27,7 +28,7 @@ use tracing::{debug, error, trace, warn};
 /// 4. Vec<Pair<String, u64>> FuncHashMismatches
 #[derive(Debug)]
 pub struct CoverageMapping<'a> {
-    profile: &'a InstrumentationProfile,
+    profile: Cow<'a, InstrumentationProfile>,
     object_files: &'a [PathBuf],
     allow_parsing_failures: bool,
     version: u64,
@@ -128,6 +129,11 @@ impl<'a> CoverageMapping<'a> {
             None => bail!("Invalid profile instrumentation, no version number provided"),
         };
 
+        let profile = if profile.has_duplicate_records() {
+            Cow::Owned(profile.clone().normalize()?)
+        } else {
+            Cow::Borrowed(profile)
+        };
         Ok(Self {
             profile,
             object_files,
@@ -142,7 +148,9 @@ impl<'a> CoverageMapping<'a> {
     pub(crate) fn get_simple_counters(&self, func: &FunctionRecordV3) -> FxHashMap<Counter, i64> {
         let mut result = FxHashMap::default();
         result.insert(Counter::default(), 0);
-        let record = self.profile.find_record_by_hash(func.header.name_hash);
+        let record = self
+            .profile
+            .find_record_by_hashes(func.header.name_hash, func.header.fn_hash);
         if let Some(func_record) = record.as_ref() {
             result.reserve(func_record.record.counts.len());
             for (id, count) in func_record.record.counts.iter().enumerate() {
@@ -690,4 +698,51 @@ fn parse_counter(input: u64, exprs: &mut Vec<Expression>) -> Counter {
         _ => unreachable!(),
     };
     Counter { kind, id }
+}
+
+#[cfg(test)]
+mod structural_hash_tests {
+    use super::*;
+    use crate::instrumentation_profile::types::{
+        compute_hash, InstrProfRecord, NamedInstrProfRecord,
+    };
+    use std::sync::Arc;
+
+    /// Mapping counters belong to a structural version, not merely a function name.
+    #[test]
+    fn coverage_mapping_selects_matching_function_hash() {
+        let mut profile = InstrumentationProfile::new(Some(7), false, false, false);
+        let name_hash = compute_hash("function");
+        for (hash, count) in [(7, 2), (8, 5), (7, 1)] {
+            profile.push_record(NamedInstrProfRecord {
+                name: Some(Arc::from("function")),
+                name_hash: Some(name_hash),
+                hash: Some(hash),
+                record: InstrProfRecord {
+                    counts: vec![count],
+                    data: None,
+                },
+            });
+        }
+        let mapping = CoverageMapping::new(&[], &profile, false).expect("valid profile version");
+        for (hash, expected) in [(7, Some(3)), (8, Some(5)), (9, None)] {
+            let function = FunctionRecordV3 {
+                header: FunctionRecordHeader {
+                    name_hash,
+                    fn_hash: hash,
+                    data_len: 0,
+                    filenames_ref: 0,
+                },
+                regions: vec![],
+                expressions: vec![],
+            };
+            assert_eq!(
+                mapping
+                    .get_simple_counters(&function)
+                    .get(&Counter::instrumentation(0))
+                    .copied(),
+                expected
+            );
+        }
+    }
 }

@@ -665,3 +665,73 @@ where
         ))
     }
 }
+
+#[cfg(test)]
+mod duplicate_records_tests {
+    use super::*;
+
+    /// Duplicate records in the first (and only) raw profile must already be merged.
+    #[test]
+    fn duplicate_records_in_single_raw_profile() {
+        // LLVM raw v7: eleven u64 header fields, two 48-byte data records,
+        // four u64 counters, and an uncompressed ULEB128-prefixed names block.
+        for counts in [[2u64, 0, 0, 3], [0, 3, 2, 0]] {
+            let mut bytes = Vec::new();
+            for value in [
+                <u64 as MemoryWidthExt>::MAGIC,
+                7,
+                0,
+                2,
+                0,
+                4,
+                0,
+                10,
+                96,
+                0,
+                1,
+            ] {
+                bytes.extend_from_slice(&value.to_le_bytes());
+            }
+            let name_hash = compute_hash("function");
+            for index in 0..2 {
+                for value in [name_hash, 7, 96 + index * 16, 0, 0] {
+                    bytes.extend_from_slice(&value.to_le_bytes());
+                }
+                bytes.extend_from_slice(&2u32.to_le_bytes());
+                bytes.extend_from_slice(&[0; 4]);
+            }
+            for count in counts {
+                bytes.extend_from_slice(&count.to_le_bytes());
+            }
+            bytes.extend_from_slice(b"\x08\x00function");
+            bytes.extend_from_slice(&[0; 6]);
+            let profile = crate::parse_bytes(&bytes).expect("valid duplicate-record raw profile");
+            let path = std::env::temp_dir().join(format!(
+                "llvm-profparser-duplicates-{}-{}.profraw",
+                std::process::id(),
+                counts[0]
+            ));
+            use std::io::Write;
+            let mut file = std::fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(&path)
+                .expect("create unique raw profile fixture");
+            file.write_all(&bytes).expect("write raw profile fixture");
+            drop(file);
+            let merged = crate::merge_profiles(&[&path]).expect("merge single raw profile");
+            std::fs::remove_file(path).expect("remove raw profile fixture");
+            assert_eq!(profile.records().len(), 2);
+
+            assert_eq!(merged.records().len(), 1);
+            assert_eq!(
+                merged
+                    .find_record_by_hash(name_hash)
+                    .expect("merged function")
+                    .record
+                    .counts,
+                [2, 3]
+            );
+        }
+    }
+}
