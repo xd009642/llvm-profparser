@@ -4,6 +4,7 @@ use std::cmp::Ordering;
 use std::convert::TryInto;
 use std::fmt;
 use std::sync::Arc;
+use tracing::warn;
 
 /// ~VARIANT_MASKS_ALL & Header.version is the version number
 pub(crate) const VARIANT_MASKS_ALL: u64 = 0xff00_0000_0000_0000;
@@ -389,8 +390,13 @@ pub struct InstrProfRecord {
 }
 
 impl InstrProfRecord {
+    /// Adds counters and value observations, saturating counts on overflow.
+    /// A counter-count mismatch warns and leaves the record unchanged. A value-site
+    /// count mismatch warns and skips that value kind, retaining merged counters
+    /// and independently merging compatible kinds, as LLVM does.
     pub fn merge(&mut self, other: &Self) {
         if self.counts.len() != other.counts.len() {
+            warn!("counter count mismatch while merging profile records");
             return;
         }
         for (own, other) in self.counts.iter_mut().zip(other.counts.iter()) {
@@ -400,19 +406,28 @@ impl InstrProfRecord {
                 None => u64::MAX, // TODO handle the warnings?
             };
         }
-        // TODO merge the data
-        if let Some((own, other)) = self.data.as_mut().zip(other.data.as_ref()) {
-            if own.indirect_callsites.len() == other.indirect_callsites.len() {
-                for (own, other) in own
-                    .indirect_callsites
-                    .iter_mut()
-                    .zip(other.indirect_callsites.iter())
-                {
-                    merge_site_records(own, other);
-                }
+        for kind in [ValueKind::IndirectCallTarget, ValueKind::MemOpSize] {
+            let own = self.data.as_mut().map(|data| match kind {
+                ValueKind::IndirectCallTarget => &mut data.indirect_callsites,
+                ValueKind::MemOpSize => &mut data.mem_op_sizes,
+            });
+            let other = other.data.as_ref().map(|data| match kind {
+                ValueKind::IndirectCallTarget => &data.indirect_callsites,
+                ValueKind::MemOpSize => &data.mem_op_sizes,
+            });
+            let own_len = own.as_ref().map_or(0, |sites| sites.len());
+            let other_len = other.map_or(0, |sites| sites.len());
+            // Absent value data represents zero sites, not an empty observation list
+            // at every site. LLVM skips mismatched kinds after merging counters.
+            if own_len != other_len {
+                warn!(
+                    ?kind,
+                    own_len, other_len, "function value site count mismatch"
+                );
+                continue;
             }
-            if own.mem_op_sizes.len() == other.mem_op_sizes.len() {
-                for (own, other) in own.mem_op_sizes.iter_mut().zip(other.mem_op_sizes.iter()) {
+            if let Some((own, other)) = own.zip(other) {
+                for (own, other) in own.iter_mut().zip(other) {
                     merge_site_records(own, other);
                 }
             }
@@ -429,32 +444,16 @@ pub struct ValueProfDataRecord {
 type InstrProfValueSiteRecord = Vec<InstrProfValueData>;
 
 fn merge_site_records(dst: &mut InstrProfValueSiteRecord, src: &InstrProfValueSiteRecord) {
-    if dst.len() == src.len() {
-        dst.sort_unstable();
-        let mut i = 0;
-        for j in src {
-            let current = dst
-                .iter_mut()
-                .enumerate()
-                .skip(i)
-                .find(|x| x.1.value >= j.value);
-
-            match current {
-                Some((index, element)) if element.value == j.value => {
-                    element.count = element.count.checked_add(j.count).unwrap_or(u64::MAX);
-                    i = index + 1;
-                }
-                Some((index, _)) => {
-                    dst.insert(index, j.clone());
-                    i = index + 1;
-                }
-                None => {
-                    i = dst.len();
-                    dst.push(j.clone());
-                }
-            }
+    dst.extend_from_slice(src);
+    dst.sort_unstable();
+    dst.dedup_by(|incoming, existing| {
+        if incoming.value == existing.value {
+            existing.count = existing.count.saturating_add(incoming.count);
+            true
+        } else {
+            false
         }
-    }
+    });
 }
 
 #[derive(Clone, Debug, Default, Eq, Hash)]
@@ -519,6 +518,148 @@ pub enum MCDCParams {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// LLVM merges all observations at a site even when runs observe different sets of values.
+    #[test]
+    fn duplicate_value_sites_preserve_observations_in_first_file() {
+        let fixture = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/data/profdata/duplicate-value-sites.proftext");
+        let profile = crate::merge_profiles(&[fixture]).expect("valid duplicate value sites");
+        assert_eq!(profile.records().len(), 1);
+        let record = &profile.records()[0];
+        assert_eq!(record.counts(), &[7]);
+        let data = record
+            .record
+            .data
+            .as_ref()
+            .expect("memory size observations");
+        assert_eq!(data.mem_op_sizes.len(), 1);
+        assert_eq!(
+            data.mem_op_sizes[0]
+                .iter()
+                .map(|entry| (entry.value, entry.count))
+                .collect::<Vec<_>>(),
+            [(8, 8), (16, 7)]
+        );
+    }
+
+    /// Site observations are keyed by value, independent of input ordering or cardinality.
+    #[test]
+    fn merge_value_site_observations_across_repeated_contributions() {
+        let mut site = vec![
+            InstrProfValueData {
+                value: 300,
+                count: 2,
+            },
+            InstrProfValueData {
+                value: 100,
+                count: 3,
+            },
+        ];
+        merge_site_records(
+            &mut site,
+            &vec![
+                InstrProfValueData {
+                    value: 100,
+                    count: 5,
+                },
+                InstrProfValueData {
+                    value: 200,
+                    count: 7,
+                },
+                InstrProfValueData {
+                    value: 300,
+                    count: 11,
+                },
+            ],
+        );
+        merge_site_records(
+            &mut site,
+            &vec![
+                InstrProfValueData {
+                    value: 200,
+                    count: 17,
+                },
+                InstrProfValueData {
+                    value: 100,
+                    count: 19,
+                },
+            ],
+        );
+        assert_eq!(
+            site.iter()
+                .map(|entry| (entry.value, entry.count))
+                .collect::<Vec<_>>(),
+            [(100, 27), (200, 24), (300, 13)]
+        );
+        merge_site_records(&mut site, &vec![]);
+        let mut empty = vec![];
+        merge_site_records(&mut empty, &site);
+        assert_eq!(
+            empty
+                .iter()
+                .map(|entry| (entry.value, entry.count))
+                .collect::<Vec<_>>(),
+            [(100, 27), (200, 24), (300, 13)]
+        );
+        merge_site_records(
+            &mut site,
+            &vec![InstrProfValueData {
+                value: 100,
+                count: u64::MAX,
+            }],
+        );
+        assert_eq!(site[0].count, u64::MAX);
+    }
+
+    /// Like LLVM, mismatched kinds retain destination observations while compatible kinds merge.
+    #[test]
+    fn merge_value_site_count_mismatch_preserves_other_kinds() {
+        let mut base = InstrProfRecord {
+            counts: vec![2],
+            data: Some(Box::new(ValueProfDataRecord {
+                indirect_callsites: vec![vec![InstrProfValueData {
+                    value: 100,
+                    count: 3,
+                }]],
+                mem_op_sizes: vec![vec![InstrProfValueData { value: 8, count: 5 }]],
+            })),
+        };
+        let other = InstrProfRecord {
+            counts: vec![7],
+            data: Some(Box::new(ValueProfDataRecord {
+                indirect_callsites: vec![],
+                mem_op_sizes: vec![vec![InstrProfValueData {
+                    value: 8,
+                    count: 11,
+                }]],
+            })),
+        };
+        base.merge(&other);
+        assert_eq!(base.counts, [9]);
+        let data = base.data.as_ref().expect("existing observations retained");
+        assert_eq!(data.indirect_callsites[0][0].count, 3);
+        assert_eq!(data.mem_op_sizes[0][0].count, 16);
+
+        let mut absent = InstrProfRecord {
+            counts: vec![13],
+            data: None,
+        };
+        absent.merge(&base);
+        assert_eq!(absent.counts, [22]);
+        assert!(absent.data.is_none());
+        base.merge(&InstrProfRecord {
+            counts: vec![17],
+            data: None,
+        });
+        assert_eq!(base.counts, [26]);
+        let data = base
+            .data
+            .as_ref()
+            .expect("mismatched source does not erase observations");
+        assert_eq!(data.indirect_callsites[0][0].count, 3);
+        assert_eq!(data.mem_op_sizes[0][0].count, 16);
+    }
 
     /// Merges value profile sites by profiled value so repeated targets are combined once.
     #[test]

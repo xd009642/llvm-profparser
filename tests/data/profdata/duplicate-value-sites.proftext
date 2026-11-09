@@ -1,0 +1,21 @@
+# Two contributions to the same memory-operation site with different observed sizes.
+foo
+11
+1
+2
+1
+1
+1
+1
+8:3
+
+foo
+11
+1
+5
+1
+1
+1
+2
+8:5
+16:7
